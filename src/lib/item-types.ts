@@ -36,6 +36,7 @@ const anio: AttributeField = { key: "year", label: "Año", kind: "number", place
 const discos: AttributeField = { key: "discs", label: "Discos", kind: "number", placeholder: "1" };
 const region: AttributeField = { key: "region", label: "Región", kind: "text", placeholder: "4" };
 const edicion: AttributeField = { key: "edition", label: "Edición", kind: "text", placeholder: "Coleccionista" };
+const genero: AttributeField = { key: "genre", label: "Género", kind: "text", placeholder: "Drama" };
 
 export const ITEM_TYPES = {
   movie: {
@@ -43,14 +44,14 @@ export const ITEM_TYPES = {
     plural: "Películas",
     tmdb: "movie",
     brandModel: false,
-    fields: [formatoVideo, anio, { key: "director", label: "Dirección", kind: "text" }, discos, region, edicion],
+    fields: [formatoVideo, anio, genero, { key: "director", label: "Dirección", kind: "text" }, discos, region, edicion],
   },
   series: {
     label: "Serie",
     plural: "Series",
     tmdb: "tv",
     brandModel: false,
-    fields: [formatoVideo, { key: "season", label: "Temporada", kind: "number", placeholder: "1" }, anio, discos, region, edicion],
+    fields: [formatoVideo, { key: "season", label: "Temporada", kind: "number", placeholder: "1" }, anio, genero, discos, region, edicion],
   },
   book: {
     label: "Libro",
@@ -60,6 +61,7 @@ export const ITEM_TYPES = {
       { key: "author", label: "Autor", kind: "text" },
       { key: "publisher", label: "Editorial", kind: "text" },
       anio,
+      genero,
       { key: "isbn", label: "ISBN", kind: "text" },
     ],
   },
@@ -71,13 +73,14 @@ export const ITEM_TYPES = {
       { key: "artist", label: "Artista", kind: "text" },
       { key: "format", label: "Formato", kind: "select", options: ["CD", "Vinilo", "Casete", "Digital"] },
       anio,
+      genero,
     ],
   },
   game: {
     label: "Videojuego",
     plural: "Videojuegos",
     brandModel: false,
-    fields: [{ key: "platform", label: "Plataforma", kind: "text", placeholder: "PS2" }, anio],
+    fields: [{ key: "platform", label: "Plataforma", kind: "text", placeholder: "PS2" }, anio, genero],
   },
   other: {
     label: "Otro",

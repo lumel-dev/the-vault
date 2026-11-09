@@ -1,0 +1,541 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-09T22:21:01+00:00",
+  "title": "Design System: The Vault",
+  "extensions": {
+    "colorMeta": {
+      "concrete": {
+        "role": "neutral",
+        "displayName": "Cemento Claro",
+        "canonical": "#d9dad6",
+        "tonalRamp": [
+          "oklch(15% 0.001 118)",
+          "oklch(26% 0.002 118)",
+          "oklch(38% 0.004 118)",
+          "oklch(49% 0.005 118)",
+          "oklch(61% 0.005 118)",
+          "oklch(72% 0.004 118)",
+          "oklch(84% 0.002 118)",
+          "oklch(95% 0.001 118)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel Gris",
+        "canonical": "#ecebe7",
+        "tonalRamp": [
+          "oklch(15% 0.001 95)",
+          "oklch(26% 0.002 95)",
+          "oklch(38% 0.004 95)",
+          "oklch(49% 0.005 95)",
+          "oklch(61% 0.005 95)",
+          "oklch(72% 0.004 95)",
+          "oklch(84% 0.002 95)",
+          "oklch(95% 0.001 95)"
+        ]
+      },
+      "kraft": {
+        "role": "secondary",
+        "displayName": "Cartón Kraft",
+        "canonical": "#c4935c",
+        "tonalRamp": [
+          "oklch(15% 0.019 69)",
+          "oklch(26% 0.040 69)",
+          "oklch(38% 0.061 69)",
+          "oklch(49% 0.082 69)",
+          "oklch(61% 0.082 69)",
+          "oklch(72% 0.061 69)",
+          "oklch(84% 0.040 69)",
+          "oklch(95% 0.019 69)"
+        ]
+      },
+      "kraft-dark": {
+        "role": "secondary",
+        "displayName": "Kraft Corrugado",
+        "canonical": "#8a6238",
+        "tonalRamp": [
+          "oklch(15% 0.016 66)",
+          "oklch(26% 0.033 66)",
+          "oklch(38% 0.051 66)",
+          "oklch(49% 0.069 66)",
+          "oklch(61% 0.069 66)",
+          "oklch(72% 0.051 66)",
+          "oklch(84% 0.033 66)",
+          "oklch(95% 0.016 66)"
+        ]
+      },
+      "tape": {
+        "role": "secondary",
+        "displayName": "Cinta de Papel",
+        "canonical": "#e8dcb4",
+        "tonalRamp": [
+          "oklch(15% 0.011 93)",
+          "oklch(26% 0.023 93)",
+          "oklch(38% 0.036 93)",
+          "oklch(49% 0.048 93)",
+          "oklch(61% 0.048 93)",
+          "oklch(72% 0.036 93)",
+          "oklch(84% 0.023 93)",
+          "oklch(95% 0.011 93)"
+        ]
+      },
+      "marker": {
+        "role": "primary",
+        "displayName": "Negro Fibrón",
+        "canonical": "#1c1b19",
+        "tonalRamp": [
+          "oklch(15% 0.001 85)",
+          "oklch(26% 0.002 85)",
+          "oklch(38% 0.003 85)",
+          "oklch(49% 0.004 85)",
+          "oklch(61% 0.004 85)",
+          "oklch(72% 0.003 85)",
+          "oklch(84% 0.002 85)",
+          "oklch(95% 0.001 85)"
+        ]
+      },
+      "marker-red": {
+        "role": "tertiary",
+        "displayName": "Fibrón Rojo",
+        "canonical": "#c4321f",
+        "tonalRamp": [
+          "oklch(15% 0.037 31)",
+          "oklch(26% 0.080 31)",
+          "oklch(38% 0.122 31)",
+          "oklch(49% 0.164 31)",
+          "oklch(61% 0.164 31)",
+          "oklch(72% 0.122 31)",
+          "oklch(84% 0.080 31)",
+          "oklch(95% 0.037 31)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Blanco Ficha",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 90)",
+          "oklch(26% 0.000 90)",
+          "oklch(38% 0.000 90)",
+          "oklch(49% 0.000 90)",
+          "oklch(61% 0.000 90)",
+          "oklch(72% 0.000 90)",
+          "oklch(84% 0.000 90)",
+          "oklch(95% 0.000 90)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Gris Lavado",
+        "canonical": "#e2e1dc",
+        "tonalRamp": [
+          "oklch(15% 0.001 97)",
+          "oklch(26% 0.003 97)",
+          "oklch(38% 0.004 97)",
+          "oklch(49% 0.006 97)",
+          "oklch(61% 0.006 97)",
+          "oklch(72% 0.004 97)",
+          "oklch(84% 0.003 97)",
+          "oklch(95% 0.001 97)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Gris Lavado Claro",
+        "canonical": "#e4e3de",
+        "tonalRamp": [
+          "oklch(15% 0.001 97)",
+          "oklch(26% 0.003 97)",
+          "oklch(38% 0.004 97)",
+          "oklch(49% 0.006 97)",
+          "oklch(61% 0.006 97)",
+          "oklch(72% 0.004 97)",
+          "oklch(84% 0.003 97)",
+          "oklch(95% 0.001 97)"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Tinta Gastada",
+        "canonical": "#57554f",
+        "tonalRamp": [
+          "oklch(15% 0.002 92)",
+          "oklch(26% 0.004 92)",
+          "oklch(38% 0.007 92)",
+          "oklch(49% 0.009 92)",
+          "oklch(61% 0.009 92)",
+          "oklch(72% 0.007 92)",
+          "oklch(84% 0.004 92)",
+          "oklch(95% 0.002 92)"
+        ]
+      },
+      "sticker-movie": {
+        "role": "tertiary",
+        "displayName": "Sticker Películas",
+        "canonical": "#e2412f",
+        "tonalRamp": [
+          "oklch(15% 0.040 30)",
+          "oklch(26% 0.086 30)",
+          "oklch(38% 0.132 30)",
+          "oklch(49% 0.178 30)",
+          "oklch(61% 0.178 30)",
+          "oklch(72% 0.132 30)",
+          "oklch(84% 0.086 30)",
+          "oklch(95% 0.040 30)"
+        ]
+      },
+      "sticker-series": {
+        "role": "tertiary",
+        "displayName": "Sticker Series",
+        "canonical": "#2f6fd6",
+        "tonalRamp": [
+          "oklch(15% 0.034 260)",
+          "oklch(26% 0.074 260)",
+          "oklch(38% 0.113 260)",
+          "oklch(49% 0.152 260)",
+          "oklch(61% 0.152 260)",
+          "oklch(72% 0.113 260)",
+          "oklch(84% 0.074 260)",
+          "oklch(95% 0.034 260)"
+        ]
+      },
+      "sticker-book": {
+        "role": "tertiary",
+        "displayName": "Sticker Libros",
+        "canonical": "#3aa35a",
+        "tonalRamp": [
+          "oklch(15% 0.029 150)",
+          "oklch(26% 0.062 150)",
+          "oklch(38% 0.095 150)",
+          "oklch(49% 0.128 150)",
+          "oklch(61% 0.128 150)",
+          "oklch(72% 0.095 150)",
+          "oklch(84% 0.062 150)",
+          "oklch(95% 0.029 150)"
+        ]
+      },
+      "sticker-music": {
+        "role": "tertiary",
+        "displayName": "Sticker Música",
+        "canonical": "#f2c230",
+        "tonalRamp": [
+          "oklch(15% 0.032 89)",
+          "oklch(26% 0.068 89)",
+          "oklch(38% 0.104 89)",
+          "oklch(49% 0.140 89)",
+          "oklch(61% 0.140 89)",
+          "oklch(72% 0.104 89)",
+          "oklch(84% 0.068 89)",
+          "oklch(95% 0.032 89)"
+        ]
+      },
+      "sticker-game": {
+        "role": "tertiary",
+        "displayName": "Sticker Videojuegos",
+        "canonical": "#ef7d22",
+        "tonalRamp": [
+          "oklch(15% 0.034 53)",
+          "oklch(26% 0.072 53)",
+          "oklch(38% 0.111 53)",
+          "oklch(49% 0.149 53)",
+          "oklch(61% 0.149 53)",
+          "oklch(72% 0.111 53)",
+          "oklch(84% 0.072 53)",
+          "oklch(95% 0.034 53)"
+        ]
+      },
+      "sticker-other": {
+        "role": "tertiary",
+        "displayName": "Sticker Otros",
+        "canonical": "#8b8f96",
+        "tonalRamp": [
+          "oklch(15% 0.002 262)",
+          "oklch(26% 0.005 262)",
+          "oklch(38% 0.007 262)",
+          "oklch(49% 0.010 262)",
+          "oklch(61% 0.010 262)",
+          "oklch(72% 0.007 262)",
+          "oklch(84% 0.005 262)",
+          "oklch(95% 0.002 262)"
+        ]
+      },
+      "wood": {
+        "role": "neutral",
+        "displayName": "Madera Oscura",
+        "canonical": "#4a3c30",
+        "tonalRamp": [
+          "oklch(15% 0.006 62)",
+          "oklch(26% 0.012 62)",
+          "oklch(38% 0.018 62)",
+          "oklch(49% 0.025 62)",
+          "oklch(61% 0.025 62)",
+          "oklch(72% 0.018 62)",
+          "oklch(84% 0.012 62)",
+          "oklch(95% 0.006 62)"
+        ]
+      },
+      "wood-dark": {
+        "role": "neutral",
+        "displayName": "Madera Oscura Profunda",
+        "canonical": "#3a2f26",
+        "tonalRamp": [
+          "oklch(15% 0.006 62)",
+          "oklch(26% 0.012 62)",
+          "oklch(38% 0.018 62)",
+          "oklch(49% 0.025 62)",
+          "oklch(61% 0.025 62)",
+          "oklch(72% 0.018 62)",
+          "oklch(84% 0.012 62)",
+          "oklch(95% 0.006 62)"
+        ]
+      },
+      "case-black": {
+        "role": "neutral",
+        "displayName": "Plástico Negro",
+        "canonical": "#161617",
+        "tonalRamp": [
+          "oklch(15% 0.000 286)",
+          "oklch(26% 0.001 286)",
+          "oklch(38% 0.001 286)",
+          "oklch(49% 0.002 286)",
+          "oklch(61% 0.002 286)",
+          "oklch(72% 0.001 286)",
+          "oklch(84% 0.001 286)",
+          "oklch(95% 0.000 286)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Nombre de la vista en la grilla."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Nombre del objeto en su ficha y títulos de vacíos."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Riel, botones, formularios; 1rem en inputs del celular."
+      },
+      "card": {
+        "displayName": "Card",
+        "purpose": "Nombre y dato de la tarjeta, mismo tamaño, distinto peso."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Subtítulos, ubicación, datos de la ficha."
+      },
+      "group-label": {
+        "displayName": "Group Label",
+        "purpose": "Sólo los encabezados del riel (Contenedores, Stickers), en mayúsculas."
+      },
+      "marker": {
+        "displayName": "Fibrón",
+        "purpose": "Sólo sobre cinta: rótulos de lugar y tapa vacía."
+      },
+      "marker-logo": {
+        "displayName": "Fibrón logo",
+        "purpose": "El logo THE VAULT en cinta."
+      }
+    },
+    "shadows": [
+      {
+        "name": "rail-active",
+        "value": "0 1px 3px rgb(28 27 25 / 16%)",
+        "purpose": "Contenedor elegido en el riel."
+      },
+      {
+        "name": "cover-rest",
+        "value": "0 6px 14px -6px rgb(28 27 25 / 55%)",
+        "purpose": "Cada tapa de la grilla."
+      },
+      {
+        "name": "cover-lifted",
+        "value": "0 22px 40px -12px rgb(28 27 25 / 70%)",
+        "purpose": "Tarjeta mientras se arrastra."
+      },
+      {
+        "name": "floating",
+        "value": "0 10px 30px -12px rgb(28 27 25 / 55%)",
+        "purpose": "Capas sobre el 3D: coincidencias, acomodar, sin resultados."
+      },
+      {
+        "name": "panel",
+        "value": "0 18px 40px -16px rgb(28 27 25 / 55%)",
+        "purpose": "Ficha del objeto en desktop."
+      },
+      {
+        "name": "panel-sheet",
+        "value": "0 -8px 30px -10px rgb(28 27 25 / 45%)",
+        "purpose": "Ficha del objeto como hoja en el celular."
+      },
+      {
+        "name": "tape",
+        "value": "0 1px 2px rgb(0 0 0 / 18%)",
+        "purpose": "El logo en cinta sobre la barra."
+      }
+    ],
+    "motion": [
+      {
+        "name": "card-hover",
+        "value": "transform 200ms ease-out",
+        "purpose": "La tapa sube 4px al pasar."
+      },
+      {
+        "name": "ui-colors",
+        "value": "color, background 150ms",
+        "purpose": "Hover de filas, botones y conmutador."
+      },
+      {
+        "name": "dim-in-place",
+        "value": "color x0.45, mezcla 55% con concrete, opacidad 0.3",
+        "purpose": "Apagar en su lugar lo que no coincide en el 3D."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      }
+    ],
+    "tapeClipPath": "polygon(0.4% 6%, 99.6% 0%, 98.8% 50%, 100% 96%, 0% 100%, 1.2% 50%)"
+  },
+  "components": [
+    {
+      "name": "Botón principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "La acción principal (Agregar): negro fibrón, 44px en la barra.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M5 12h14M12 5v14\"/></svg>Agregar</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 16px;border:1px solid transparent;border-radius:6px;background:var(--marker,#1c1b19);color:#fff;font:500 14px/1 Archivo, system-ui, sans-serif;cursor:pointer;transition:background .15s,transform .1s}.ds-btn-primary:hover{background:rgb(28 27 25/80%)}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(28 27 25/28%)}.ds-btn-primary:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "Botón secundario",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Acciones de una ficha (Editar).",
+      "html": "<button class=\"ds-btn-secondary\">Editar</button>",
+      "css": ".ds-btn-secondary{height:32px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--secondary,#e2e1dc);color:var(--marker,#1c1b19);font:500 14px/1 Archivo, system-ui, sans-serif;cursor:pointer;transition:background .15s}.ds-btn-secondary:hover{background:color-mix(in oklch,#e2e1dc,#1c1b19 5%)}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(28 27 25/28%)}.ds-btn-secondary:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "Botón ghost",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acción menor sin fondo (Sacar de la bóveda).",
+      "html": "<button class=\"ds-btn-ghost\">Sacar de la bóveda</button>",
+      "css": ".ds-btn-ghost{height:32px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--marker,#1c1b19);font:500 14px/1 Archivo, system-ui, sans-serif;cursor:pointer;transition:background .15s}.ds-btn-ghost:hover{background:var(--muted,#e4e3de)}.ds-btn-ghost:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(28 27 25/28%)}"
+    },
+    {
+      "name": "Búsqueda ¿Lo tengo?",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "La búsqueda de la barra: borde de fibrón, contador rojo de coincidencias.",
+      "html": "<label class=\"ds-search\"><span class=\"ds-search-icon\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg></span><input type=\"search\" placeholder=\"¿Lo tengo?\" value=\"lost\"><span class=\"ds-search-count\">3 coinciden</span></label>",
+      "css": ".ds-search{position:relative;display:block;width:360px;max-width:100%}.ds-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgb(28 27 25/70%);display:flex}.ds-search input{box-sizing:border-box;width:100%;height:44px;padding:0 104px 0 40px;border:2px solid var(--marker,#1c1b19);border-radius:6px;background:#fff;color:var(--marker,#1c1b19);font:400 16px Archivo, system-ui, sans-serif;caret-color:var(--marker-red,#c4321f);outline:none;transition:box-shadow .15s}.ds-search input::placeholder{color:#57554f}.ds-search input:focus-visible{box-shadow:0 0 0 3px rgb(28 27 25/30%)}.ds-search-count{position:absolute;right:10px;top:50%;transform:translateY(-50%);padding:2px 6px;border-radius:4px;background:var(--marker-red,#c4321f);color:#fff;font:600 12px Archivo, system-ui, sans-serif;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Barra kraft con conmutador",
+      "kind": "nav",
+      "refersTo": "top-bar",
+      "description": "Barra superior de cartón con logo en cinta y conmutador Mueble/Grilla.",
+      "html": "<header class=\"ds-topbar\"><span class=\"ds-logo\">THE VAULT</span><div class=\"ds-toggle\" role=\"tablist\"><button class=\"is-active\">Mueble</button><button>Grilla</button></div></header>",
+      "css": ".ds-topbar{display:flex;align-items:center;gap:16px;height:64px;padding:0 20px;background:var(--kraft,#c4935c);border-bottom:3px solid var(--kraft-dark,#8a6238)}.ds-logo{display:inline-block;transform:rotate(-2deg);padding:2px 14px;background:var(--tape,#e8dcb4);color:var(--marker,#1c1b19);font:400 20px/1.25 \"Permanent Marker\", cursive;letter-spacing:.025em;box-shadow:0 1px 2px rgb(0 0 0/18%);clip-path:polygon(0.4% 6%,99.6% 0%,98.8% 50%,100% 96%,0% 100%,1.2% 50%)}.ds-toggle{display:flex;height:44px;overflow:hidden;border:2px solid var(--marker,#1c1b19);border-radius:6px;margin-left:auto}.ds-toggle button{padding:0 14px;border:0;background:rgb(255 255 255/50%);color:var(--marker,#1c1b19);font:600 14px Archivo, system-ui, sans-serif;cursor:pointer;transition:background .15s}.ds-toggle button:hover{background:#fff}.ds-toggle button.is-active{background:var(--marker,#1c1b19);color:#fff}.ds-toggle button:focus-visible{outline:2px solid var(--marker,#1c1b19);outline-offset:-4px}"
+    },
+    {
+      "name": "Fila del riel",
+      "kind": "nav",
+      "refersTo": "rail-row",
+      "description": "Contenedor en el riel: ícono de su forma, nombre, coincidencias y cantidad; activo, normal y recibiendo un arrastre.",
+      "html": "<ul class=\"ds-rail\"><li><button class=\"ds-rail-row is-active\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"M3 8h18v12H3zM3 8l2-4h14l2 4M9 12h6\"/></svg><span>Toda la casa</span><span class=\"ds-rail-n\">49</span></button></li><li><button class=\"ds-rail-row\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"M3 8h18v12H3zM3 8l2-4h14l2 4M9 12h6\"/></svg><span>Caja 3</span><span class=\"ds-rail-hit\">3</span><span class=\"ds-rail-n\">10</span></button></li><li><button class=\"ds-rail-row is-over\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"M3 8h18v12H3zM3 8l2-4h14l2 4M9 12h6\"/></svg><span>Living</span><span class=\"ds-rail-n\">22</span></button></li></ul>",
+      "css": ".ds-rail{list-style:none;margin:0;padding:12px;width:240px;background:var(--paper,#ecebe7);display:grid;gap:2px}.ds-rail-row{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:1px solid transparent;border-radius:6px;background:transparent;color:rgb(28 27 25/80%);font:400 14px Archivo, system-ui, sans-serif;text-align:left;cursor:pointer;transition:background .15s,color .15s}.ds-rail-row:hover{background:rgb(255 255 255/60%);color:#1c1b19}.ds-rail-row:focus-visible{outline:2px solid #1c1b19}.ds-rail-row.is-active{background:#fff;color:#1c1b19;font-weight:600;box-shadow:0 1px 3px rgb(28 27 25/16%)}.ds-rail-row.is-over{background:var(--tape,#e8dcb4);border-color:var(--marker,#1c1b19);color:#1c1b19}.ds-rail-n{margin-left:auto;font-size:12px;color:#57554f;font-variant-numeric:tabular-nums}.ds-rail-hit{margin-left:auto;padding:1px 6px;border-radius:9999px;background:var(--marker-red,#c4321f);color:#fff;font:600 12px Archivo, system-ui, sans-serif}.ds-rail-hit+.ds-rail-n{margin-left:6px}"
+    },
+    {
+      "name": "Stickers de tipo",
+      "kind": "chip",
+      "refersTo": "sticker",
+      "description": "El sticker circular de color por tipo, como filtro (forma de píldora del celular).",
+      "html": "<div class=\"ds-stickers\"><button class=\"ds-sticker-chip\"><span class=\"ds-sticker\" style=\"background:#e2412f\"></span>Películas</button><button class=\"ds-sticker-chip is-active\"><span class=\"ds-sticker\" style=\"background:#2f6fd6\"></span>Series</button><button class=\"ds-sticker-chip\"><span class=\"ds-sticker\" style=\"background:#3aa35a\"></span>Libros</button><button class=\"ds-sticker-chip\"><span class=\"ds-sticker\" style=\"background:#f2c230\"></span>Música</button><button class=\"ds-sticker-chip\"><span class=\"ds-sticker\" style=\"background:#ef7d22\"></span>Videojuegos</button><button class=\"ds-sticker-chip\"><span class=\"ds-sticker\" style=\"background:#8b8f96\"></span>Otros</button></div>",
+      "css": ".ds-stickers{display:flex;flex-wrap:wrap;gap:4px}.ds-sticker-chip{display:inline-flex;align-items:center;gap:10px;padding:6px 12px;border:1px solid rgb(28 27 25/14%);border-radius:9999px;background:transparent;color:rgb(28 27 25/75%);font:400 14px Archivo, system-ui, sans-serif;cursor:pointer;transition:background .15s,color .15s}.ds-sticker-chip:hover{color:#1c1b19}.ds-sticker-chip:focus-visible{outline:2px solid #1c1b19}.ds-sticker-chip.is-active{background:#fff;color:#1c1b19;font-weight:600}.ds-sticker{width:12px;height:12px;border-radius:9999px;flex-shrink:0;box-shadow:inset 0 -1px 0 rgb(0 0 0/18%),0 0 0 1.5px rgb(255 255 255/70%)}"
+    },
+    {
+      "name": "Tarjeta de la grilla",
+      "kind": "card",
+      "refersTo": "item-cover",
+      "description": "Tapa 2:3 (acá la tapa vacía rotulada en cinta) con nombre y dato al mismo tamaño.",
+      "html": "<button class=\"ds-card\"><div class=\"ds-cover\"><span class=\"ds-sticker\" style=\"background:#2f6fd6\"></span><span class=\"ds-cover-tape\">Lost</span></div><p class=\"ds-card-name\">Lost</p><p class=\"ds-card-sub\"><span class=\"ds-sticker\" style=\"background:#2f6fd6;width:10px;height:10px\"></span>Temporada 1 · DVD</p></button>",
+      "css": ".ds-card{display:block;width:144px;padding:0;border:0;background:none;text-align:left;cursor:grab;font-family:Archivo, system-ui, sans-serif;color:#1c1b19}.ds-cover{position:relative;aspect-ratio:2/3;border-radius:3px;background:#161617;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;padding:9%;box-sizing:border-box;box-shadow:0 6px 14px -6px rgb(28 27 25/55%),inset 0 0 0 1px rgb(0 0 0/25%);transition:transform .2s ease-out}.ds-card:hover .ds-cover{transform:translateY(-4px)}.ds-card:focus-visible{outline:none}.ds-card:focus-visible .ds-cover{box-shadow:0 0 0 2px #d9dad6,0 0 0 5px #1c1b19}.ds-card:active .ds-cover{box-shadow:0 22px 40px -12px rgb(28 27 25/70%)}.ds-cover-tape{transform:rotate(-2deg);padding:.25em .5em;background:var(--tape,#e8dcb4);color:#1c1b19;font:400 15px/1.2 \"Permanent Marker\", cursive;clip-path:polygon(0.4% 6%,99.6% 0%,98.8% 50%,100% 96%,0% 100%,1.2% 50%)}.ds-sticker{display:inline-block;width:16px;height:16px;border-radius:9999px;box-shadow:inset 0 -1px 0 rgb(0 0 0/18%),0 0 0 1.5px rgb(255 255 255/70%)}.ds-card-name{margin:8px 0 2px;font-size:13px;font-weight:600;line-height:1.375}.ds-card-sub{margin:0;display:flex;align-items:center;gap:6px;font-size:13px;color:#57554f}"
+    },
+    {
+      "name": "Ficha dónde está",
+      "kind": "custom",
+      "refersTo": "item-panel",
+      "description": "El panel del objeto elegido con la cinta de ubicación escrita con fibrón.",
+      "html": "<aside class=\"ds-panel\"><h2>Lost · T1</h2><p class=\"ds-panel-meta\">Serie · N.º 0012</p><p class=\"ds-tape-where\">CAJA 3<span>1.º lugar</span></p></aside>",
+      "css": ".ds-panel{width:320px;box-sizing:border-box;padding:20px;border-radius:12px;background:#fff;font-family:Archivo, system-ui, sans-serif;color:#1c1b19;box-shadow:0 18px 40px -16px rgb(28 27 25/55%)}.ds-panel h2{margin:0;font-size:18px;font-weight:700;line-height:1.25}.ds-panel-meta{margin:4px 0 0;font-size:12px;color:#57554f}.ds-tape-where{display:inline-block;margin:16px 0 0;padding:4px 12px;transform:rotate(-1deg);background:var(--tape,#e8dcb4);color:#1c1b19;font:400 16px/1.375 \"Permanent Marker\", cursive;clip-path:polygon(0.4% 6%,99.6% 0%,98.8% 50%,100% 96%,0% 100%,1.2% 50%)}.ds-tape-where span{display:block;font-size:14px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "La Mudanza",
+    "overview": "The Vault se ve como una casa en plena mudanza vista con buena luz: piso de cemento claro, cajas de cartón kraft con las solapas abiertas, estanterías de madera oscura, y cada estante y cada caja rotulados con un pedazo de cinta de papel escrito con fibrón. No es un catálogo de pósters sobre fondo oscuro; lo que se ve es el mueble, con los DVDs de lomo hacia afuera, en el tamaño real de cada objeto (una caja Amaray mide 14 mm de lomo, una caja de cartón tiene paredes de 10,5 cm y los lomos asoman por arriba).\n\nEs claro a propósito: se usa en casa frente al mueble y afuera, con el celular a plena luz. La interfaz plana (barra, riel, grilla, fichas) es Archivo sobre cemento y papel, sobria y densa; el carácter lo ponen los materiales de la mudanza, que aparecen siempre con el mismo significado: la cinta rotula, el fibrón negro escribe, el fibrón rojo señala, el sticker de color dice el tipo. Filtrar apaga en su lugar y nada se mueve: lo que no coincide se oscurece y se funde con el cemento, lo que coincide queda señalado con una flecha.\n\nLa pantalla tiene dos caras del mismo inventario: el **Mueble** (3D, para encontrar y mostrar) y la **Grilla** (plana, para cargar y buscar rápido). Las dos comparten el riel, la búsqueda y el mismo vocabulario de marcas.",
+    "keyCharacteristics": [
+      "Cemento claro de fondo, barra de cartón kraft con borde corrugado oscuro, riel de papel gris.",
+      "Cinta de papel con fibrón como único rótulo de lugar: logo, estantes, cajas, la ficha \"dónde está\".",
+      "Sticker circular de color por tipo, en el lomo, en la tarjeta, en la leyenda del riel.",
+      "Fibrón rojo sólo para señalar: flecha sobre lo que coincide, cruz sobre lo que se borra, raya en el hueco donde cae lo que se arrastra.",
+      "Objetos a escala real; filtrar oscurece en su lugar, no reordena."
+    ],
+    "rules": [
+      {
+        "name": "La Regla del Fibrón Rojo",
+        "body": "El rojo sólo señala algo concreto: una coincidencia, un borrado pendiente, el hueco donde va a caer un objeto. Nunca decora, nunca es fondo de una superficie, nunca es un botón.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Sticker",
+        "body": "Cada tipo tiene un color y ese color vive sólo en su sticker circular. Si aparece un color saturado que no es un sticker ni el fibrón rojo, sobra.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Fibrón en la Cinta",
+        "body": "Permanent Marker sólo se escribe sobre cinta de papel (o como textura en el 3D: rótulos y lomos de paquetes): logo, rótulos de contenedores, la ficha de ubicación, la tapa vacía. Nunca en botones, títulos, cuerpo ni navegación.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla del Tamaño Único",
+        "body": "En listas densas (tarjetas, coincidencias, riel) el nombre y el dato van al mismo tamaño o a un paso; se distinguen por peso y por color, no por escala.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla de la Escala Real",
+        "body": "En el 3D cada objeto mide lo que mide (DVD 14 mm de lomo, libros con grosor y alto propios, estantes de 32 cm de profundidad, cajas de 10,5 cm de pared). Los muebles se dimensionan por lo que contienen, nunca al revés.",
+        "section": "layout"
+      },
+      {
+        "name": "La Regla del Apagón en su Lugar",
+        "body": "Filtrar no mueve nada: lo que no coincide queda donde está, con su color oscurecido al 45%, mezclado 55% con el cemento y al 30% de opacidad. Lo que coincide conserva su material y su flecha.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** rotular todo lugar (estante, caja, mueble, la ficha \"dónde está\") con cinta de papel y Permanent Marker en mayúsculas, pegada torcida entre -1° y -2°.",
+      "**Do** marcar el tipo de cada objeto sólo con su sticker circular, con los seis colores fijos.",
+      "**Do** reservar el fibrón rojo para señalar: contador de coincidencias, flecha sobre el lomo, cruz de borrado, raya del hueco.",
+      "**Do** apagar en su lugar lo que no coincide (oscurecido, mezclado con el cemento, al 30%) en vez de esconderlo o reordenarlo.",
+      "**Do** mantener los objetos a escala real y las tapas a 2:3.",
+      "**Do** usar sombras de negro fibrón con opacidad y desplazamiento negativo, como en el vocabulario de Elevation & Depth."
+    ],
+    "donts": [
+      "**Don't** marcar coincidencias con círculos alrededor de los lomos: se pisan en lomos de 14 mm. Se usa la flecha.",
+      "**Don't** usar Permanent Marker fuera de la cinta: ni en botones, ni en títulos, ni en el cuerpo.",
+      "**Don't** convertir la vista principal en una grilla oscura de pósters; el fondo es cemento claro y lo que se ve es el mueble.",
+      "**Don't** usar el rojo como fondo de superficie, color de marca o botón principal; como botón sólo aparece tenue, para confirmar un borrado.",
+      "**Don't** agregar colores saturados fuera de los stickers y el fibrón rojo.",
+      "**Don't** guardar ni subir imágenes propias: las tapas se piden en vivo a TMDB y, sin tapa, se dibuja la caja vacía rotulada."
+    ]
+  }
+}

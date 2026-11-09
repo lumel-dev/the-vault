@@ -1,37 +1,53 @@
 # The Vault
 
-Una web app para llevar el inventario de lo que tenés: películas y series en DVD, libros, música,
-juegos o cualquier otra cosa. Cada objeto se ve por su tapa, y las tapas se arrastran: entre
-ellas para ordenarlas, o sobre un estante para guardarlas ahí. Cada persona tiene su cuenta y su
-colección.
+Una web app para llevar el inventario de lo que tenés y saber dónde está: películas y series en
+DVD, libros, música, juegos o cualquier otra cosa. Cada persona tiene su cuenta y su colección.
+
+La colección se ve de dos maneras. **Mueble** es la casa en 3D: tus estanterías, cajas y muebles
+con puertas, con cada cosa en su lugar y con su forma real (una caja de DVD de 14 mm, un Blu-ray
+más bajo, un vinilo, un libro). Los DVDs se ven de lomo; al tocar uno se desliza afuera y gira
+mostrando la tapa. **Grilla** es la vista plana de tapas, para cargar y buscar rápido.
 
 Las tapas no se guardan en ningún lado: se piden en vivo a [TMDB](https://www.themoviedb.org)
-con la referencia que guarda la base. Lo que no tiene tapa (o no está en TMDB) se muestra con una
-tapa genérica del tipo.
+con la referencia que guarda la base. Lo que no tiene tapa se ve como una caja negra con el
+nombre escrito en una cinta.
 
-Next.js 16 (App Router, React Compiler), Postgres con Drizzle, Auth.js v5, dnd-kit, Tailwind v4 y
-shadcn/ui. Está sólo en español.
+Next.js 16 (App Router, React Compiler), three.js con React Three Fiber, Postgres con Drizzle,
+Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está sólo en español.
 
 ## Qué trae
 
-- **Tipos de objeto** con sus datos propios: película (formato, año, dirección, discos, región,
-  edición), serie (lo mismo con temporada), libro, música, videojuego y "otro" (marca y modelo).
-- **Alta desde TMDB**: buscás el título, lo elegís y vienen el nombre, el año, la sinopsis, la
-  dirección y la tapa. En una serie elegís además la temporada, que tiene su propia tapa.
-- **Estantes**: lugares físicos (Living, Caja 3). Se crean desde la barra lateral; borrarlos deja
-  sus objetos en "Sin ubicar".
-- **Arrastrar**: en desktop se arrastra con el mouse; en el celular, manteniendo apretada la tapa.
-  Con teclado: espacio levanta, flechas mueven, espacio suelta.
-- **Búsqueda** por nombre, temporada, dirección, autor, marca o descripción, sin importar
-  acentos y tolerando errores de tipeo ("matirx" encuentra Matrix). Se combina con el filtro de
-  tipo y de estante, y queda en la URL.
+- **Contenedores** con forma: estantería abierta (con la cantidad de estantes que tenga), caja y
+  mueble con puertas (las puertas se abren solas cuando hay que mirar adentro). Cada uno lleva su
+  nombre en una cinta de papel escrita con fibrón. Lo que no está en ningún lado queda en la mesa
+  de "Sin ubicar".
+- **Tipos de objeto** con sus datos propios: película (formato, año, género, dirección, discos,
+  región, edición), serie (lo mismo con temporada), libro, música, videojuego y "otro" (marca y
+  modelo). Cada tipo tiene su sticker de color en el lomo.
+- **Número de inventario** correlativo por usuario (N.º 0142), escrito en el lomo: sirve para
+  anotarlo en el objeto real. No se reutiliza al borrar.
+- **Alta desde TMDB**: buscás el título y vienen nombre, año, género, sinopsis, dirección y tapa.
+  En una serie elegís la temporada, que tiene su propia tapa. "Agregar y cargar otro" deja el
+  lugar y el formato para seguir cargando.
+- **Arrastrar**: en el mueble, un lomo se lleva a otro estante o caja y cae en el hueco que marca
+  la raya roja; en la grilla, una tapa se suelta sobre un contenedor o entre las demás. En el
+  celular se mantiene apretado para arrastrar. Con teclado, en la grilla: espacio levanta,
+  flechas mueven, espacio suelta.
+- **Búsqueda "¿lo tengo?"**: instantánea, en el browser, por nombre, temporada, dirección, autor,
+  marca, descripción o número de inventario, sin importar acentos y tolerando errores de tipeo
+  ("matirx" encuentra Matrix). En el mueble, lo que no coincide se apaga en su lugar y cada
+  coincidencia queda señalada con una flecha de fibrón; la lista de arriba dice dónde está cada una.
+- **Ordenar** por nombre (sin contar "El", "La", "The"…), género, tipo o año. En la grilla ordena
+  lo que ves; en el mueble, con un contenedor elegido, "Acomodar así" lo ordena de verdad, estante
+  por estante, como se ordena a mano.
+- **Sacar de la bóveda** tacha el objeto con fibrón y deja 5 segundos para deshacer.
 
 ## Agregar un tipo o un campo
 
 Los tipos y sus campos viven en `src/lib/item-types.ts`. Agregar un campo (por ejemplo "idioma"
 a las películas) o un tipo nuevo es sumar una entrada ahí: el formulario, el detalle y la
 validación salen de esa definición, y los datos van a una columna JSONB, así que no hace falta
-migrar la base.
+migrar la base. Las medidas reales de cada objeto en 3D están en `src/lib/scene-layout.ts`.
 
 ## Levantarlo en local
 
@@ -88,9 +104,12 @@ dueño de la base, porque la primera migración crea las extensiones `pg_trgm` y
 
 - **Las tapas se piden a TMDB desde el browser de cada usuario**: si TMDB no responde, se ve la
   tapa genérica. La app sólo guarda el path (`/abc.jpg`) y nunca acepta URLs completas.
+- **La colección entera viaja al browser** (búsqueda, orden y 3D corren ahí). Está pensado para
+  colecciones de cientos de objetos; con varios miles conviene paginar la grilla y revisar el 3D.
+- **El 3D se baja aparte**: la grilla y la búsqueda funcionan aunque el mueble todavía se esté
+  armando, también en el celular.
 - **Un cambio en `schema.ts` necesita su migración** (`pnpm db:generate`) en el mismo PR: el
   deploy aplica lo que hay en `drizzle/`, no el schema.
-- La búsqueda difusa usa `pg_trgm`. Con colecciones de miles de objetos alcanza y sobra; si
-  algún día son cientos de miles, revisar el umbral en `src/lib/queries.ts`.
 
-Las convenciones del código y el porqué de cada decisión están en [AGENTS.md](AGENTS.md).
+Las convenciones del código y el porqué de cada decisión están en [AGENTS.md](AGENTS.md). El
+sistema visual está en [DESIGN.md](DESIGN.md).

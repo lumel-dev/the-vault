@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { requireUserId } from "@/lib/auth/session";
-import { movieDirector, searchTmdb, tvSeasons, type TmdbResult, type TmdbSeason } from "@/lib/tmdb";
+import { movieDetails, searchTmdb, tvSeasons, type TmdbResult, type TmdbSeason } from "@/lib/tmdb";
 import type { ActionResult } from "./items";
 
 // Pasan por el server para que el token de TMDB no llegue nunca al browser.
@@ -23,12 +23,12 @@ export async function searchTmdbAction(kind: "movie" | "tv", query: string): Pro
   return run(() => searchTmdb(k, q));
 }
 
-export async function tvSeasonsAction(tvId: number): Promise<ActionResult<{ posterPath: string | null; seasons: TmdbSeason[] }>> {
+export async function tvSeasonsAction(tvId: number): Promise<ActionResult<{ posterPath: string | null; genre: string | null; seasons: TmdbSeason[] }>> {
   const id = z.number().int().positive().parse(tvId);
   return run(() => tvSeasons(id));
 }
 
-export async function movieDirectorAction(movieId: number): Promise<ActionResult<string | null>> {
+export async function movieDetailsAction(movieId: number): Promise<ActionResult<{ director: string | null; genre: string | null }>> {
   const id = z.number().int().positive().parse(movieId);
-  return run(() => movieDirector(id));
+  return run(() => movieDetails(id));
 }

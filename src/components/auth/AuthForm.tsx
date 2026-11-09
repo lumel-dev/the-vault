@@ -52,14 +52,14 @@ export function AuthForm({ mode, action, signupEnabled }: Props) {
         {isSignup ? (
           <>
             ¿Ya tenés cuenta?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href="/login" className="font-semibold underline underline-offset-4 hover:text-marker-red">
               Entrá
             </Link>
           </>
         ) : signupEnabled ? (
           <>
             ¿Primera vez?{" "}
-            <Link href="/registro" className="text-primary hover:underline">
+            <Link href="/registro" className="font-semibold underline underline-offset-4 hover:text-marker-red">
               Creá tu cuenta
             </Link>
           </>

@@ -7,18 +7,17 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
   if (session?.user?.id) redirect("/");
 
   return (
-    <main className="relative grid min-h-dvh place-items-center overflow-hidden px-4 py-12">
-      {/* Un resplandor dorado detrás de la tarjeta, como la luz de una bóveda abierta. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute top-1/2 left-1/2 size-[42rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl"
-      />
-      <div className="relative w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Logo className="[&_svg]:size-10 [&>span]:text-2xl" />
-          <p className="text-sm text-muted-foreground">Tu colección, a la vista.</p>
+    <main className="grid min-h-dvh place-items-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-7 flex flex-col items-center gap-3 text-center">
+          <Logo className="text-3xl" />
+          <p className="text-sm text-muted-foreground">Lo que tenés y dónde está.</p>
         </div>
-        <div className="rounded-2xl border bg-card/80 p-6 shadow-2xl shadow-black/40 backdrop-blur">{children}</div>
+        {/* La tarjeta es una caja de cartón: tapa kraft arriba y el formulario adentro. */}
+        <div className="overflow-hidden rounded-lg bg-card shadow-[0_18px_40px_-18px_rgb(28_27_25/55%)]">
+          <div aria-hidden className="h-3 border-b-2 border-kraft-dark bg-kraft" />
+          <div className="p-6">{children}</div>
+        </div>
       </div>
     </main>
   );

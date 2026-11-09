@@ -95,8 +95,8 @@ interface RawSeason {
 }
 
 /** Las temporadas de una serie, sin los "especiales" (temporada 0). Cada una tiene su tapa. */
-export async function tvSeasons(tvId: number): Promise<{ posterPath: string | null; seasons: TmdbSeason[] }> {
-  const data = await tmdbGet<{ poster_path?: string | null; seasons?: RawSeason[] }>(`/tv/${tvId}`);
+export async function tvSeasons(tvId: number): Promise<{ posterPath: string | null; genre: string | null; seasons: TmdbSeason[] }> {
+  const data = await tmdbGet<{ poster_path?: string | null; genres?: { name: string }[]; seasons?: RawSeason[] }>(`/tv/${tvId}`);
   const seasons = (data.seasons ?? [])
     .filter((s) => s.season_number > 0)
     .map((s) => ({
@@ -106,12 +106,20 @@ export async function tvSeasons(tvId: number): Promise<{ posterPath: string | nu
       episodeCount: s.episode_count ?? null,
       posterPath: s.poster_path ?? null,
     }));
-  return { posterPath: data.poster_path ?? null, seasons };
+  return { posterPath: data.poster_path ?? null, genre: genreLabel(data.genres), seasons };
 }
 
-/** La dirección de una película (puede haber más de una persona). */
-export async function movieDirector(movieId: number): Promise<string | null> {
-  const data = await tmdbGet<{ crew?: { job: string; name: string }[] }>(`/movie/${movieId}/credits`);
-  const names = (data.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
+/** Los géneros como se guardan: los dos primeros, separados por coma ("Drama, Crimen"). */
+export function genreLabel(genres: { name: string }[] | undefined): string | null {
+  const names = (genres ?? []).map((g) => g.name).filter(Boolean).slice(0, 2);
   return names.length ? names.join(", ") : null;
+}
+
+/** Dirección (puede haber más de una persona) y géneros de una película, en una sola llamada. */
+export async function movieDetails(movieId: number): Promise<{ director: string | null; genre: string | null }> {
+  const data = await tmdbGet<{ genres?: { name: string }[]; credits?: { crew?: { job: string; name: string }[] } }>(`/movie/${movieId}`, {
+    append_to_response: "credits",
+  });
+  const names = (data.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
+  return { director: names.length ? names.join(", ") : null, genre: genreLabel(data.genres) };
 }

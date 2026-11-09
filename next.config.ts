@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   agentRules: false,
   reactCompiler: true,
   output: "standalone",
+  // Chrome pide /favicon.ico aunque la página declare src/app/icon.svg: se le sirve el mismo.
+  async rewrites() {
+    return [{ source: "/favicon.ico", destination: "/icon.svg" }];
+  },
   images: {
     // Las tapas se piden directo a la API que las sirve (TMDB): la app no guarda imágenes, ni
     // siquiera en la caché del optimizador de Next, que las escribiría en el disco del contenedor.

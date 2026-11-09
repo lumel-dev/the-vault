@@ -66,11 +66,11 @@
   }
 }
 
-/* La app es oscura y nada más: es una vitrina de tapas, y los posters lucen sobre fondo oscuro.
- * `color-scheme: dark` hace que los controles nativos (scrollbars, selects) acompañen. */
+/* Mundo "Mudanza": cemento claro, cartón kraft, cinta de papel y fibrón. Claro porque se usa en
+ * casa frente al mueble y afuera, con el celular a plena luz. */
 @theme inline {
   --font-sans: var(--font-sans-app);
-  --font-display: var(--font-display-app);
+  --font-marker: var(--font-marker-app);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -91,6 +91,20 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-concrete: var(--concrete);
+  --color-paper: var(--paper);
+  --color-kraft: var(--kraft);
+  --color-kraft-dark: var(--kraft-dark);
+  --color-tape: var(--tape);
+  --color-marker: var(--marker);
+  --color-marker-red: var(--marker-red);
+  --color-sticker-movie: #e2412f;
+  --color-sticker-series: #2f6fd6;
+  --color-sticker-book: #3aa35a;
+  --color-sticker-music: #f2c230;
+  --color-sticker-game: #ef7d22;
+  --color-sticker-other: #8b8f96;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -98,28 +112,35 @@
 }
 
 :root {
-  color-scheme: dark;
-  --radius: 0.625rem;
+  color-scheme: light;
+  --radius: 0.5rem;
 
-  /* Acero oscuro con un dorado de bóveda como único acento. */
-  --background: oklch(0.16 0.008 260);
-  --foreground: oklch(0.95 0.005 260);
-  --card: oklch(0.205 0.01 260);
-  --card-foreground: oklch(0.95 0.005 260);
-  --popover: oklch(0.22 0.01 260);
-  --popover-foreground: oklch(0.95 0.005 260);
-  --primary: oklch(0.8 0.13 80);
-  --primary-foreground: oklch(0.2 0.02 80);
-  --secondary: oklch(0.26 0.012 260);
-  --secondary-foreground: oklch(0.95 0.005 260);
-  --muted: oklch(0.25 0.01 260);
-  --muted-foreground: oklch(0.7 0.012 260);
-  --accent: oklch(0.28 0.014 260);
-  --accent-foreground: oklch(0.97 0.005 260);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.8 0.13 80 / 60%);
+  --concrete: #d9dad6;
+  --paper: #ecebe7;
+  --kraft: #c4935c;
+  --kraft-dark: #8a6238;
+  --tape: #e8dcb4;
+  --marker: #1c1b19;
+  --marker-red: #c4321f;
+
+  --background: var(--concrete);
+  --foreground: var(--marker);
+  --card: #ffffff;
+  --card-foreground: var(--marker);
+  --popover: #ffffff;
+  --popover-foreground: var(--marker);
+  --primary: var(--marker);
+  --primary-foreground: #ffffff;
+  --secondary: #e2e1dc;
+  --secondary-foreground: var(--marker);
+  --muted: #e4e3de;
+  --muted-foreground: #57554f;
+  --accent: #e2e1dc;
+  --accent-foreground: var(--marker);
+  --destructive: var(--marker-red);
+  --border: rgb(28 27 25 / 14%);
+  --input: rgb(28 27 25 / 28%);
+  --ring: rgb(28 27 25 / 55%);
 }
 
 @layer base {
@@ -129,13 +150,35 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  ::selection {
+    background: var(--tape);
+    color: var(--marker);
+  }
+  input,
+  textarea {
+    caret-color: var(--marker-red);
+  }
+  :focus-visible {
+    outline-color: var(--marker);
+  }
+  html {
+    scrollbar-color: rgb(28 27 25 / 35%) transparent;
+  }
 }
 
-/* Filas que se deslizan con el dedo (estantes y tipos en el celular): sin barra de scroll, que en
- * Windows se dibuja gruesa debajo de cada una. */
+/* Filas que se deslizan con el dedo (contenedores y tipos en el celular): sin barra de scroll, que
+ * en Windows se dibuja gruesa debajo de cada una. */
 @utility no-scrollbar {
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* La cinta de papel: el rótulo de cada contenedor, escrito con fibrón. */
+@utility tape {
+  background: var(--tape);
+  color: var(--marker);
+  font-family: var(--font-marker);
+  clip-path: polygon(0.4% 6%, 99.6% 0%, 98.8% 50%, 100% 96%, 0% 100%, 1.2% 50%);
 }

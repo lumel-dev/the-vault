@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { createItem, updateItem, type ItemInput } from "@/lib/actions/items";
-import { movieDirectorAction, searchTmdbAction, tvSeasonsAction } from "@/lib/actions/tmdb";
+import { movieDetailsAction, searchTmdbAction, tvSeasonsAction } from "@/lib/actions/tmdb";
+import { inventoryLabel } from "@/lib/containers";
 import { ITEM_TYPE_KEYS, ITEM_TYPES, typeDef, type ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import type { TmdbResult, TmdbSeason } from "@/lib/tmdb";
@@ -39,6 +40,8 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
   const [brand, setBrand] = useState(item?.brand ?? "");
   const [model, setModel] = useState(item?.model ?? "");
   const [shelfId, setShelfId] = useState<string | null>(item ? item.shelfId : defaultShelfId);
+  const [level, setLevel] = useState(item?.level ?? 0);
+  const currentShelf = shelves.find((s) => s.id === shelfId) ?? null;
   // Lo nuevo arranca en DVD: es para lo que más se usa la app.
   const [attrs, setAttrs] = useState<Record<string, string>>(item?.attributes ?? { format: "DVD" });
   const [cover, setCover] = useState<CoverRef | null>(
@@ -53,8 +56,23 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
     setAttrs((a) => ({ ...a, [key]: value }));
   }
 
-  function submit(e: React.FormEvent) {
+  const [round, setRound] = useState(0);
+
+  /** Después de "Agregar y cargar otro": queda el lugar, el tipo y el formato; lo demás se limpia. */
+  function resetForNext() {
+    setName("");
+    setDescription("");
+    setBrand("");
+    setModel("");
+    setAttrs(attrs.format ? { format: attrs.format } : {});
+    setCover(null);
+    setExternal(null);
+    setRound((r) => r + 1);
+  }
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const again = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "again";
     const input: ItemInput = {
       type,
       name,
@@ -62,6 +80,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
       brand: def.brandModel ? brand : null,
       model: def.brandModel ? model : null,
       shelfId,
+      level: currentShelf ? Math.min(level, currentShelf.levels - 1) : 0,
       attributes: attrs,
       coverSource: cover?.source ?? null,
       coverRef: cover?.ref ?? null,
@@ -69,10 +88,18 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
       externalId: external,
     };
     startTransition(async () => {
-      const res = item ? await updateItem(item.id, input) : await createItem(input);
+      if (item) {
+        const res = await updateItem(item.id, input);
+        if (!res.ok) return void toast.error(res.error);
+        toast.success("Cambios guardados");
+        return onDone();
+      }
+      const res = await createItem(input);
       if (!res.ok) return void toast.error(res.error);
-      toast.success(editing ? "Cambios guardados" : `"${name.trim()}" está en la bóveda`);
-      onDone();
+      // El número es para escribirlo en el lomo real, como en el de la pantalla.
+      toast.success(`"${name.trim()}" es el ${inventoryLabel(res.data.inventoryNumber)}`);
+      if (again) resetForNext();
+      else onDone();
     });
   }
 
@@ -80,7 +107,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
     <form onSubmit={submit} className="grid gap-5">
       {def.tmdb && (
         <TmdbPicker
-          key={type}
+          key={`${type}-${round}`}
           kind={def.tmdb}
           enabled={tmdbEnabled}
           initialQuery={name}
@@ -109,7 +136,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
         </div>
 
         <div className="grid content-start gap-3.5">
-          <div className="grid grid-cols-2 gap-3">
+          <div className={cn("grid gap-3", currentShelf && currentShelf.levels > 1 ? "grid-cols-3" : "grid-cols-2")}>
             <Field label="Tipo" htmlFor="f-type">
               <NativeSelect id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
                 {ITEM_TYPE_KEYS.map((k) => (
@@ -119,8 +146,15 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
                 ))}
               </NativeSelect>
             </Field>
-            <Field label="Estante" htmlFor="f-shelf">
-              <NativeSelect id="f-shelf" value={shelfId ?? ""} onChange={(e) => setShelfId(e.target.value || null)}>
+            <Field label="Dónde está" htmlFor="f-shelf">
+              <NativeSelect
+                id="f-shelf"
+                value={shelfId ?? ""}
+                onChange={(e) => {
+                  setShelfId(e.target.value || null);
+                  setLevel(0);
+                }}
+              >
                 <option value="">Sin ubicar</option>
                 {shelves.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -129,6 +163,17 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
                 ))}
               </NativeSelect>
             </Field>
+            {currentShelf && currentShelf.levels > 1 && (
+              <Field label="Estante" htmlFor="f-level">
+                <NativeSelect id="f-level" value={String(level)} onChange={(e) => setLevel(Number(e.target.value))}>
+                  {Array.from({ length: currentShelf.levels }, (_, i) => (
+                    <option key={i} value={i}>
+                      {i === 0 ? "1 (arriba)" : i === currentShelf.levels - 1 ? `${i + 1} (abajo)` : String(i + 1)}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
           </div>
 
           <Field label="Nombre" htmlFor="f-name">
@@ -184,7 +229,12 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
         <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={pending || !name.trim()} className="sm:min-w-28">
+        {!editing && (
+          <Button type="submit" name="intent" value="again" variant="outline" disabled={pending || !name.trim()}>
+            Agregar y cargar otro
+          </Button>
+        )}
+        <Button type="submit" name="intent" value="done" disabled={pending || !name.trim()} className="sm:min-w-28">
           {pending && <Loader2 className="animate-spin" />}
           {editing ? "Guardar" : "Agregar"}
         </Button>
@@ -232,6 +282,7 @@ function TmdbPicker({
   const [show, setShow] = useState<TmdbResult | null>(null);
   const [seasons, setSeasons] = useState<TmdbSeason[] | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
+  const [showGenre, setShowGenre] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
 
   if (!enabled) {
@@ -265,9 +316,13 @@ function TmdbPicker({
         externalId: `movie:${r.id}`,
       };
       onPick(base);
-      // La dirección viene en otra llamada; si falla, queda lo demás.
-      void movieDirectorAction(r.id).then((res) => {
-        if (res.ok && res.data) onPick({ ...base, attributes: { ...base.attributes, director: res.data } });
+      // Dirección y géneros vienen en otra llamada; si falla, queda lo demás.
+      void movieDetailsAction(r.id).then((res) => {
+        if (!res.ok) return;
+        const extra: Record<string, string> = {};
+        if (res.data.director) extra.director = res.data.director;
+        if (res.data.genre) extra.genre = res.data.genre;
+        onPick({ ...base, attributes: { ...base.attributes, ...extra } });
       });
       setResults(null);
       return;
@@ -279,6 +334,10 @@ function TmdbPicker({
       const res = await tvSeasonsAction(r.id);
       if (!res.ok) return void toast.error(res.error);
       setSeasons(res.data.seasons);
+      setShowGenre(res.data.genre);
+      if (res.data.genre) {
+        onPick({ name: r.title, attributes: { genre: res.data.genre }, overview: r.overview, posterPath: r.posterPath, externalId: `tv:${r.id}` });
+      }
     });
   }
 
@@ -287,7 +346,7 @@ function TmdbPicker({
     setSelectedSeason(s.seasonNumber);
     onPick({
       name: show.title,
-      attributes: { season: String(s.seasonNumber), ...(s.year ? { year: s.year } : {}) },
+      attributes: { season: String(s.seasonNumber), ...(s.year ? { year: s.year } : {}), ...(showGenre ? { genre: showGenre } : {}) },
       overview: show.overview,
       posterPath: s.posterPath ?? show.posterPath,
       externalId: `tv:${show.id}`,

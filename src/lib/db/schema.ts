@@ -16,6 +16,8 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   passwordSalt: text("password_salt").notNull(),
+  // El último número de inventario entregado. Ver `items.inventoryNumber`.
+  inventorySeq: integer("inventory_seq").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -28,6 +30,11 @@ export const shelves = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    // La forma del contenedor en la vista 3D: "shelf" (estantería abierta), "box" (caja) o
+    // "cabinet" (mueble con puertas). Ver `src/lib/containers.ts`.
+    kind: text("kind").notNull().default("shelf"),
+    // Cuántos estantes tiene (en una caja, siempre 1).
+    levels: integer("levels").notNull().default(3),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -58,8 +65,13 @@ export const items = pgTable(
     // El registro en la API de origen (ej. "tmdb" + "movie:603").
     externalSource: text("external_source"),
     externalId: text("external_id"),
+    // En qué estante del contenedor está (0 = el de arriba).
+    level: integer("level").notNull().default(0),
     // Orden manual de toda la colección del usuario. Ver `reorderItems`.
     position: integer("position").notNull().default(0),
+    // Número de inventario correlativo por usuario (N.º 0142), el que va escrito en el lomo.
+    // Nunca se reutiliza: borrar el 12 no hace que el próximo sea el 12.
+    inventoryNumber: integer("inventory_number").notNull(),
     // Lo que matchea la búsqueda: en minúsculas y sin acentos (`vault_unaccent`, migración 0000).
     searchText: text("search_text").generatedAlwaysAs(
       sql`vault_unaccent(lower(coalesce(name, '') || ' ' || coalesce(brand, '') || ' ' || coalesce(model, '') || ' ' || coalesce(description, '') || ' ' || attributes::text))`,
@@ -69,6 +81,7 @@ export const items = pgTable(
   },
   (t) => [
     index("items_user_position_idx").on(t.userId, t.position),
+    uniqueIndex("items_user_inventory_idx").on(t.userId, t.inventoryNumber),
     index("items_search_trgm_idx").using("gin", sql`${t.searchText} gin_trgm_ops`),
   ],
 );

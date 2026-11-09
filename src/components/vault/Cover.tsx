@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { coverUrl, type CoverSize } from "@/lib/covers";
 import { cn } from "@/lib/utils";
-import { TypeIcon } from "./TypeIcon";
+import { Sticker } from "./Sticker";
 
 interface Props {
   type: string;
@@ -14,25 +14,18 @@ interface Props {
   className?: string;
 }
 
-/** Un tono estable por nombre, para que cada tapa genérica sea distinta pero siempre la misma. */
-function hueOf(text: string): number {
-  let h = 0;
-  for (const ch of text) h = (h * 31 + ch.codePointAt(0)!) % 360;
-  return h;
-}
-
 /**
- * La tapa de un objeto, en proporción de caja de DVD (2:3). Si no hay tapa o la API no la sirve,
- * se dibuja una genérica con el ícono del tipo y el nombre: la app nunca guarda imágenes.
+ * La tapa de un objeto, en proporción de caja de DVD (2:3). Sin tapa (o si TMDB no la sirve) se
+ * dibuja la caja vacía: plástico negro con el nombre escrito en un pedazo de cinta y el sticker
+ * del tipo, que es como se rotula en casa algo que no tiene tapa. La app nunca guarda imágenes.
  */
 export function Cover({ type, name, coverSource, coverRef, size = "md", className }: Props) {
   const url = coverUrl(coverSource, coverRef, size);
   const [failed, setFailed] = useState<string | null>(null);
   const showImage = url && failed !== url;
-  const hue = hueOf(name);
 
   return (
-    <div className={cn("relative aspect-[2/3] overflow-hidden rounded-lg bg-muted", className)}>
+    <div className={cn("relative aspect-[2/3] overflow-hidden rounded-[3px] bg-[#161617]", className)}>
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- se sirve directo desde TMDB, sin optimizador
         <img
@@ -44,20 +37,15 @@ export function Cover({ type, name, coverSource, coverRef, size = "md", classNam
           className="size-full object-cover"
         />
       ) : (
-        <div
-          className="flex size-full flex-col justify-between p-3"
-          style={{
-            background: `linear-gradient(155deg, oklch(0.36 0.06 ${hue}) 0%, oklch(0.22 0.03 ${(hue + 40) % 360}) 100%)`,
-          }}
-        >
-          <TypeIcon type={type} className="size-7 text-white/50" strokeWidth={1.5} />
-          <span className="line-clamp-4 font-display text-[0.95em] leading-tight font-bold text-white/85 [overflow-wrap:anywhere]">
+        <div className="flex size-full flex-col justify-between p-[9%] [container-type:inline-size]">
+          <Sticker type={type} className="size-[16%] min-h-2.5 min-w-2.5" />
+          <span className="tape line-clamp-4 -rotate-2 px-[0.5em] py-[0.25em] text-[clamp(0.6rem,7cqi,1rem)] leading-tight [overflow-wrap:anywhere]">
             {name}
           </span>
         </div>
       )}
-      {/* Brillo de caja plástica sobre la tapa. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-tr from-transparent via-transparent to-white/10 ring-1 ring-white/10 ring-inset" />
+      {/* El borde de la caja de plástico. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-black/25 ring-inset" />
     </div>
   );
 }

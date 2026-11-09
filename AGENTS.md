@@ -47,6 +47,11 @@ contrato; uno que lo cambia, lo actualiza.
 - **Las tapas no se guardan.** `cover_source` + `cover_ref` (hoy sólo `tmdb` + path) y
   `src/lib/covers.ts` arma la URL. `isValidCover` rechaza URLs completas. `images.unoptimized`
   está a propósito: el optimizador de Next cachearía las tapas en el disco del contenedor.
+- **Tapas y CORS**: todas las `<img>` de tapas van con `crossOrigin="anonymous"`. TMDB sólo manda
+  `Access-Control-Allow-Origin` cuando el pedido trae `Origin`; si un `<img>` común cachea la
+  copia sin el header, la textura del 3D queda bloqueada. `Cover` y `useCover` reintentan una vez
+  con `?cors=1` (otra entrada de caché), y `Cover` revisa al montar si la imagen ya falló antes de
+  hidratar, porque ese `onError` React no lo ve.
 - **TMDB sólo desde el server** (`src/lib/tmdb.ts`, expuesto por `src/lib/actions/tmdb.ts`): el
   token nunca llega al browser. Las tapas sí se piden desde el browser (TMDB manda CORS `*`, que
   es lo que permite usarlas como textura en WebGL).
@@ -83,6 +88,11 @@ SQL; hoy no la usa la app.
 
 ## Vista 3D
 
+- **Habitación en L** (`foldIntoL`): el layout arma una fila y después la pliega; los primeros
+  muebles van contra la pared izquierda (x = 0, girados 90°) y el resto, con la mesa, contra la del
+  fondo (z = 0). Cada mueble tiene `origin` y `rotationY`; `toWorld`/`toLocal` pasan entre las
+  coordenadas de la fila (las de los objetos y estantes) y la habitación. Con menos de tres
+  muebles no hay L.
 - `src/lib/scene-layout.ts` es puro: medidas reales de cada objeto (`itemShape`), dónde va cada
   mueble y cada objeto, y los huecos donde se puede soltar (`dropTarget`). Tiene tests; la escena
   sólo dibuja.
@@ -97,8 +107,11 @@ SQL; hoy no la usa la app.
 - Las flechas de búsqueda van fuera del grupo que se anima, en coordenadas del mundo, con el ancho
   del propio lomo: con círculos, los de lomos vecinos se pisaban.
 - Arrastre 3D: con mouse arranca a los 6 px; con el dedo, a los 250 ms sin moverse (si no,
-  deslizar mueve la cámara). Se proyecta el puntero sobre un plano en el frente de los muebles.
-  Dentro del mismo estante, el lugar se cuenta sin el objeto que se mueve.
+  deslizar mueve la cámara). Como los muebles miran a dos paredes, el rayo del puntero se prueba
+  contra el frente de cada estante en las coordenadas de su mueble y gana el más cercano. Soltar a
+  menos de 12 px de donde se agarró no mueve nada. Dentro del mismo estante, el lugar se cuenta sin
+  el objeto que se mueve.
+- Lo elegido nunca se apaga por la búsqueda (si no, su tapa quedaba casi invisible).
 - El 3D no es accesible por teclado: todo lo que hace tiene equivalente en la grilla.
 
 ## Migraciones

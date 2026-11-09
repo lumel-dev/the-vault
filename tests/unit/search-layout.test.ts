@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildLayout, dropTarget, itemShape } from "@/lib/scene-layout";
+import { buildLayout, CORNER, dropTarget, frontNormal, itemShape, toLocal, toWorld } from "@/lib/scene-layout";
 import { matcher, search, wordSimilarity, type Searchable } from "@/lib/search";
 import { whereabouts, whereLabel } from "@/lib/where";
 
@@ -102,6 +102,61 @@ describe("armado de la escena", () => {
     assert.equal(dropTarget(layout, between - 0.001, slot.floor + 0.1)!.index, 1);
     assert.equal(dropTarget(layout, slot.x1 - 0.01, slot.floor + 0.1)!.index, 2);
     assert.equal(dropTarget(layout, -5, 0.5), null);
+  });
+});
+
+describe("habitación en L", () => {
+  const four = [
+    { id: "a", name: "A", kind: "shelf", levels: 3 },
+    { id: "b", name: "B", kind: "box", levels: 1 },
+    { id: "c", name: "C", kind: "cabinet", levels: 2 },
+    { id: "d", name: "D", kind: "box", levels: 1 },
+  ];
+  const layout = buildLayout(four, []);
+  const byId = new Map(layout.containers.map((c) => [c.id, c]));
+
+  it("los primeros van a la pared izquierda y el resto, con la mesa, al fondo", () => {
+    const walls = layout.containers.map((c) => c.wall);
+    assert.equal(walls[0], "left");
+    assert.equal(walls.at(-1), "back");
+    assert.equal(layout.containers.at(-1)!.kind, "table");
+    assert.ok(walls.indexOf("back") > 0 && !walls.slice(walls.indexOf("back")).includes("left"), "una sola vuelta");
+  });
+
+  it("cada mueble mira hacia el centro de la habitación con la espalda contra su pared", () => {
+    for (const c of layout.containers) {
+      const back = toWorld(c, [c.x + c.width / 2, 0, -c.depth / 2]);
+      const n = frontNormal(c);
+      if (c.wall === "left") {
+        assert.ok(Math.abs(back[0]) < 1e-9);
+        assert.ok(n[0] > 0.99);
+      } else {
+        assert.ok(Math.abs(back[2]) < 1e-9);
+        assert.ok(n[2] > 0.99);
+      }
+    }
+  });
+
+  it("nada se pisa en el rincón", () => {
+    const lastLeft = layout.containers.filter((c) => c.wall === "left").at(-1)!;
+    const nearCorner = toWorld(lastLeft, [lastLeft.x + lastLeft.width, 0, 0]);
+    assert.ok(nearCorner[2] >= CORNER - 1e-9);
+    const firstBack = layout.containers.find((c) => c.wall === "back")!;
+    assert.ok(toWorld(firstBack, [firstBack.x, 0, 0])[0] >= CORNER - 1e-9);
+  });
+
+  it("ida y vuelta entre la fila y la habitación", () => {
+    for (const c of [byId.get("a")!, byId.get("d")!]) {
+      const p: [number, number, number] = [c.x + 0.1, 0.3, 0.05];
+      const back = toLocal(c, toWorld(c, p));
+      p.forEach((v, i) => assert.ok(Math.abs(v - back[i]) < 1e-9));
+    }
+  });
+
+  it("con menos de tres muebles no hay L", () => {
+    const two = buildLayout(four.slice(0, 2), []);
+    assert.ok(two.containers.every((c) => c.wall === "back"));
+    assert.equal(two.leftLength, 0);
   });
 });
 

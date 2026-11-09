@@ -7,7 +7,7 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three/addons/controls/OrbitControls.js";
 import { coverUrl } from "@/lib/covers";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
-import { buildLayout, dropTarget, type PlacedContainer, type PlacedItem, type SceneLayout, type Slot } from "@/lib/scene-layout";
+import { buildLayout, frontNormal, slotIndex, toLocal, toWorld, type PlacedContainer, type PlacedItem, type SceneLayout, type Slot } from "@/lib/scene-layout";
 import {
   buildSpineAtlas,
   concreteTexture,
@@ -33,8 +33,6 @@ export interface VaultSceneProps {
   onSelectContainer: (id: string | null) => void;
   onPlace: (itemId: string, containerId: string | null, level: number, index: number) => void;
 }
-
-const FRONT_PLANE_Z = 0.16;
 
 /* ------------------------------------------------------------- materiales */
 
@@ -95,7 +93,7 @@ export default function VaultScene(props: VaultSceneProps) {
       frameloop="demand"
       shadows={!coarse}
       dpr={[1, coarse ? 1.5 : 2]}
-      camera={{ fov: 32, near: 0.05, far: 80, position: [1.5, 1.2, 5] }}
+      camera={{ fov: 34, near: 0.05, far: 80, position: [4, 2.5, 4] }}
       onPointerMissed={() => props.onSelect(null)}
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       aria-label="Los muebles de la colección en 3D. Para hacer todo con teclado, usá la vista Grilla."
@@ -116,6 +114,12 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
 
   const placedById = useMemo(() => new Map(layout.items.map((p) => [p.id, p])), [layout]);
+  const containerById = useMemo(() => new Map(layout.containers.map((c) => [c.id, c])), [layout]);
+  const itemsByContainer = useMemo(() => {
+    const out = new Map<string | null, PlacedItem[]>();
+    for (const p of layout.items) out.set(p.containerId, [...(out.get(p.containerId) ?? []), p]);
+    return out;
+  }, [layout]);
   const matchedPlaced = useMemo(
     () => (matches ? layout.items.filter((p) => matches.has(p.id)) : []),
     [matches, layout],
@@ -139,72 +143,84 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
     return open;
   }, [focusContainer, matchedPlaced, selectedId, placedById]);
 
+  const extent = Math.max(layout.leftLength, layout.backLength) + 1;
+
   return (
     <>
       <hemisphereLight args={["#ffffff", "#b9b4a8", 1.35]} />
-      {/* luz de frente, suave: deja leer los lomos dentro de los muebles */}
-      <directionalLight position={[layout.width / 2, 1.2, 5]} intensity={0.55} />
+      {/* luz suave desde el medio de la habitación: deja leer los lomos en las dos paredes */}
+      <directionalLight position={[extent * 0.6, 1.4, extent * 0.6]} intensity={0.55} />
       <directionalLight
-        position={[layout.width * 0.3 - 1, 4.5, 3.5]}
+        position={[extent * 0.75, 4.5, extent * 0.55]}
         intensity={1.6}
         castShadow={!coarse}
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-2}
-        shadow-camera-right={layout.width + 2}
-        shadow-camera-top={3}
-        shadow-camera-bottom={-1}
+        shadow-camera-left={-extent}
+        shadow-camera-right={extent}
+        shadow-camera-top={extent}
+        shadow-camera-bottom={-extent}
+        shadow-camera-far={20}
         shadow-bias={-0.0004}
       />
       <Room layout={layout} mats={mats} />
 
-      {layout.containers.map((c) => (
-        <Furniture
-          key={c.id ?? "loose"}
-          container={c}
-          mats={mats}
-          open={drag !== null || openContainers.has(c.id)}
-          onSelect={() => onSelectContainer(c.id)}
-        />
-      ))}
-
-      {atlas &&
-        layout.items.map((p) => {
-          const item = itemById.get(p.id);
-          if (!item) return null;
-          return (
-            <ItemMesh
-              key={p.id}
-              placed={p}
-              item={item}
-              atlas={atlas}
-              mats={mats}
-              dim={matches !== null && !matches.has(p.id)}
-              matched={matches !== null && matches.has(p.id)}
-              selected={selectedId === p.id}
-              striking={pendingDelete.has(p.id)}
-              dragging={drag?.id === p.id}
-              dragPoint={drag?.id === p.id ? drag.point : null}
-              castShadow={!coarse}
-              onPress={(e) => startPress(e, p.id)}
-            />
-          );
-        })}
-
-      {drag?.target && <DropHint target={drag.target} mats={mats} />}
+      {layout.containers.map((c) => {
+        const target = drag?.target?.slot.containerId === c.id ? drag.target : null;
+        return (
+          // Cada mueble se dibuja en sus coordenadas de fila y este grupo lo lleva a su pared.
+          <group key={c.id ?? "loose"} position={c.origin} rotation={[0, c.rotationY, 0]}>
+            <group position={[-c.x, 0, 0]}>
+              <Furniture container={c} mats={mats} open={drag !== null || openContainers.has(c.id)} onSelect={() => onSelectContainer(c.id)} />
+              {atlas &&
+                (itemsByContainer.get(c.id) ?? []).map((p) => {
+                  const item = itemById.get(p.id);
+                  if (!item) return null;
+                  const dragging = drag?.id === p.id;
+                  return (
+                    <ItemMesh
+                      key={p.id}
+                      placed={p}
+                      item={item}
+                      atlas={atlas}
+                      mats={mats}
+                      // Lo elegido nunca se apaga: si no coincide con la búsqueda, su tapa quedaba casi invisible.
+                      dim={matches !== null && !matches.has(p.id) && selectedId !== p.id}
+                      matched={matches !== null && matches.has(p.id)}
+                      selected={selectedId === p.id}
+                      striking={pendingDelete.has(p.id)}
+                      dragging={dragging}
+                      dragPoint={dragging && drag ? new THREE.Vector3(...toLocal(c, drag.point.toArray() as [number, number, number])) : null}
+                      castShadow={!coarse}
+                      onPress={(e) => startPress(e, p.id)}
+                    />
+                  );
+                })}
+              {target && <DropHint target={target} mats={mats} />}
+            </group>
+          </group>
+        );
+      })}
 
       <OrbitControls
         makeDefault
         enableDamping
         dampingFactor={0.12}
         minDistance={0.35}
-        maxDistance={14}
+        maxDistance={16}
         minPolarAngle={0.55}
         maxPolarAngle={1.62}
-        minAzimuthAngle={-0.85}
-        maxAzimuthAngle={0.85}
+        // De frente a la pared del fondo (0) hasta de frente a la de la izquierda (90°).
+        minAzimuthAngle={-0.3}
+        maxAzimuthAngle={Math.PI / 2 + 0.3}
         screenSpacePanning
       />
-      <CameraRig layout={layout} focusContainer={focusContainer} matched={settledMatches} selected={selectedId ? placedById.get(selectedId) ?? null : null} />
+      <CameraRig
+        layout={layout}
+        containerById={containerById}
+        focusContainer={focusContainer}
+        matched={settledMatches}
+        selected={selectedId ? placedById.get(selectedId) ?? null : null}
+      />
     </>
   );
 
@@ -221,25 +237,53 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
     if (!touch && controls) controls.enabled = false;
 
     const raycaster = new THREE.Raycaster();
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -FRONT_PLANE_Z);
     const ndc = new THREE.Vector2();
-    const hit = new THREE.Vector3();
     const camera = e.camera;
     const dom = (e.nativeEvent.target as HTMLElement) ?? document.body;
+    const grabbed = placedById.get(id);
+    const grabbedWorld = grabbed ? new THREE.Vector3(...toWorld(containerById.get(grabbed.containerId)!, grabbed.position)) : new THREE.Vector3();
 
+    /**
+     * Los muebles miran a dos paredes distintas, así que no hay un único plano de arrastre: se
+     * prueba el frente de cada estante, en las coordenadas de su mueble, y gana el más cercano a
+     * la cámara. Fuera de todo estante, el objeto sigue al puntero a la distancia de donde salió.
+     */
     const project = (clientX: number, clientY: number) => {
       const rect = dom.getBoundingClientRect();
       ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(ndc, camera);
-      if (!raycaster.ray.intersectPlane(plane, hit)) return null;
-      return hit.clone();
+      const ray = raycaster.ray;
+      let best: { t: number; slot: Slot; x: number } | null = null;
+      for (const slot of layout.slots) {
+        const c = containerById.get(slot.containerId);
+        if (!c) continue;
+        const o = toLocal(c, ray.origin.toArray() as [number, number, number]);
+        const far = toLocal(c, ray.at(1, new THREE.Vector3()).toArray() as [number, number, number]);
+        const dz = far[2] - o[2];
+        if (Math.abs(dz) < 1e-6) continue;
+        const t = (slot.z - o[2]) / dz;
+        if (t <= 0 || (best && t >= best.t)) continue;
+        const x = o[0] + (far[0] - o[0]) * t;
+        const y = o[1] + (far[1] - o[1]) * t;
+        if (x < slot.x0 || x > slot.x1 || y < slot.y0 || y > slot.y1) continue;
+        best = { t, slot, x };
+      }
+      if (best) {
+        const point = ray.at(best.t, new THREE.Vector3());
+        // El objeto flota apenas delante del estante, hacia la cámara.
+        point.add(camera.position.clone().sub(point).normalize().multiplyScalar(0.12));
+        return { point, target: { slot: best.slot, index: slotIndex(best.slot, best.x) } };
+      }
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()).negate(), grabbedWorld);
+      const hit = ray.intersectPlane(plane, new THREE.Vector3());
+      return hit ? { point: hit, target: null } : null;
     };
 
     const begin = (clientX: number, clientY: number) => {
       started = true;
       if (controls) controls.enabled = false;
-      const point = project(clientX, clientY) ?? new THREE.Vector3();
-      setDrag({ id, point, target: dropTarget(layout, point.x, point.y) });
+      const p = project(clientX, clientY);
+      setDrag({ id, point: p?.point ?? grabbedWorld.clone(), target: p?.target ?? null });
     };
 
     const longPress = touch ? window.setTimeout(() => !cancelled && begin(start.x, start.y), 250) : 0;
@@ -254,8 +298,8 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
         if (dist < 6) return;
         begin(ev.clientX, ev.clientY);
       }
-      const point = project(ev.clientX, ev.clientY);
-      if (point) setDrag({ id, point, target: dropTarget(layout, point.x, point.y) });
+      const p = project(ev.clientX, ev.clientY);
+      if (p) setDrag({ id, point: p.point, target: p.target });
     };
 
     const up = (ev: PointerEvent) => {
@@ -268,9 +312,11 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
         if (!cancelled && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 8) onSelect(id === selectedId ? null : id);
         return;
       }
-      const point = project(ev.clientX, ev.clientY);
-      const target = point ? dropTarget(layout, point.x, point.y) : null;
       setDrag(null);
+      // Soltar casi donde se agarró no mueve nada: si no, un toque largo sin arrastrar podía caer
+      // en el estante de otro mueble que el rayo cruza antes (en la L, los muebles se superponen).
+      if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 12) return;
+      const target = project(ev.clientX, ev.clientY)?.target ?? null;
       if (!target) return;
       const from = placedById.get(id);
       let index = target.index;
@@ -452,7 +498,7 @@ function ItemMesh({
     const target = new THREE.Vector3(...base);
     const rot = new THREE.Euler(lying ? -Math.PI / 2 : 0, 0, 0);
     if (dragPoint) {
-      target.set(dragPoint.x, dragPoint.y + h * 0.15, FRONT_PLANE_Z + 0.18);
+      target.set(dragPoint.x, dragPoint.y + h * 0.15, dragPoint.z);
       rot.set(-0.1, -0.35, 0.05);
     } else if (selected) {
       if (lying) {
@@ -538,17 +584,15 @@ function useCover(item: VaultItem | null): THREE.Texture | null {
     let alive = true;
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
-    loader.load(
-      url,
-      (texture) => {
-        if (!alive) return texture.dispose();
-        texture.colorSpace = THREE.SRGBColorSpace;
-        setLoaded({ url, texture });
-        invalidate();
-      },
-      undefined,
-      () => {},
-    );
+    const done = (texture: THREE.Texture) => {
+      if (!alive) return texture.dispose();
+      texture.colorSpace = THREE.SRGBColorSpace;
+      setLoaded({ url, texture });
+      invalidate();
+    };
+    // Si la copia cacheada no trae CORS (la cargó un <img> viejo), se pide otra URL: misma imagen,
+    // otra entrada de caché.
+    loader.load(url, done, undefined, () => loader.load(`${url}?cors=1`, done, undefined, () => {}));
     return () => {
       alive = false;
     };
@@ -559,18 +603,26 @@ function useCover(item: VaultItem | null): THREE.Texture | null {
 /* ------------------------------------------------------------------ muebles */
 
 function Room({ layout, mats }: { layout: SceneLayout; mats: Materials }) {
-  const w = layout.width + 10;
+  const back = layout.backLength + 3;
+  const left = Math.max(layout.leftLength, 1) + 3;
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[layout.width / 2, 0, 2]} material={mats.floor} receiveShadow>
-        <planeGeometry args={[w, 9]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[back / 2 - 1, 0, left / 2 - 1]} material={mats.floor} receiveShadow>
+        <planeGeometry args={[back + 4, left + 4]} />
       </mesh>
-      <mesh position={[layout.width / 2, 2, -0.45]} material={mats.wall} receiveShadow>
-        <planeGeometry args={[w, 4]} />
+      {/* pared del fondo (z = 0) y pared de la izquierda (x = 0): el rincón es el origen */}
+      <mesh position={[back / 2, 2, -0.002]} material={mats.wall} receiveShadow>
+        <planeGeometry args={[back, 4]} />
       </mesh>
-      {/* zócalo: separa la pared del piso, que son del mismo cemento */}
-      <mesh position={[layout.width / 2, 0.04, -0.44]} material={mats.baseboard}>
-        <boxGeometry args={[w, 0.08, 0.02]} />
+      <mesh position={[-0.002, 2, left / 2]} rotation={[0, Math.PI / 2, 0]} material={mats.wall} receiveShadow>
+        <planeGeometry args={[left, 4]} />
+      </mesh>
+      {/* zócalos: separan la pared del piso, que son del mismo cemento */}
+      <mesh position={[back / 2, 0.04, 0.01]} material={mats.baseboard}>
+        <boxGeometry args={[back, 0.08, 0.02]} />
+      </mesh>
+      <mesh position={[0.01, 0.04, left / 2]} material={mats.baseboard}>
+        <boxGeometry args={[0.02, 0.08, left]} />
       </mesh>
     </group>
   );
@@ -760,16 +812,19 @@ function DropHint({ target, mats }: { target: { slot: Slot; index: number }; mat
 /* ------------------------------------------------------------------ cámara */
 
 /**
- * Lleva la cámara a lo que importa: toda la colección, el mueble elegido, lo que coincide con la
- * búsqueda o el objeto que se sacó. Vuela una vez por cambio y después la cámara es del usuario.
+ * Lleva la cámara a lo que importa: toda la casa (en diagonal, desde el medio de la habitación,
+ * mirando al rincón de la L), el mueble elegido (de frente), lo que coincide con la búsqueda o el
+ * objeto que se sacó. Vuela una vez por cambio y después la cámara es del usuario.
  */
 function CameraRig({
   layout,
+  containerById,
   focusContainer,
   matched,
   selected,
 }: {
   layout: SceneLayout;
+  containerById: Map<string | null, PlacedContainer>;
   focusContainer: string | null | "all";
   matched: PlacedItem[];
   selected: PlacedItem | null;
@@ -781,41 +836,56 @@ function CameraRig({
   const goal = useRef<{ target: THREE.Vector3; position: THREE.Vector3 } | null>(null);
 
   const frame = useMemo(() => {
-    let box: THREE.Box3;
+    const box = new THREE.Box3();
+    const add = (c: PlacedContainer, p: [number, number, number]) => box.expandByPoint(new THREE.Vector3(...toWorld(c, p)));
+    const addContainer = (c: PlacedContainer) => {
+      for (const x of [c.x, c.x + c.width]) for (const y of [0, c.height]) for (const z of [-c.depth / 2, c.depth / 2]) add(c, [x, y, z]);
+    };
+    const facing = new THREE.Vector3();
+    const look = (c: PlacedContainer) => facing.add(new THREE.Vector3(...frontNormal(c)));
+
     if (selected) {
-      const p = new THREE.Vector3(...selected.position);
-      // Lo que se saca de una caja sube: hay que dejarle lugar arriba a la tapa.
+      const c = containerById.get(selected.containerId)!;
       const up = selected.upright ? 0.22 : 0.42;
-      box = new THREE.Box3(p.clone().add(new THREE.Vector3(-0.28, -0.16, 0)), p.clone().add(new THREE.Vector3(0.28, up, 0.2)));
+      const [x, y, z] = selected.position;
+      // Lo que se saca de una caja sube: hay que dejarle lugar arriba a la tapa.
+      add(c, [x - 0.28, y - 0.16, z]);
+      add(c, [x + 0.28, y + up, z + 0.2]);
+      look(c);
     } else if (matched.length) {
-      box = new THREE.Box3();
-      for (const m of matched) box.expandByPoint(new THREE.Vector3(...m.position));
-      box.expandByVector(new THREE.Vector3(0.25, 0.22, 0));
-    } else if (focusContainer !== "all") {
-      const c = layout.containers.find((k) => k.id === focusContainer);
-      box = c
-        ? new THREE.Box3(new THREE.Vector3(c.x - 0.1, 0, 0), new THREE.Vector3(c.x + c.width + 0.1, c.height + 0.1, 0))
-        : new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(layout.width, layout.height, 0));
+      for (const m of matched) {
+        const c = containerById.get(m.containerId)!;
+        const [x, y, z] = m.position;
+        add(c, [x - 0.2, y - 0.15, z]);
+        add(c, [x + 0.2, y + 0.2, z]);
+        look(c);
+      }
+    } else if (focusContainer !== "all" && containerById.has(focusContainer)) {
+      const c = containerById.get(focusContainer)!;
+      addContainer(c);
+      look(c);
     } else {
-      box = new THREE.Box3(new THREE.Vector3(-0.04, 0, 0), new THREE.Vector3(layout.width + 0.04, layout.height + 0.02, 0));
+      for (const c of layout.containers) addContainer(c);
+      // Toda la casa: en diagonal hacia el rincón si hay L, casi de frente si no.
+      facing.set(layout.leftLength ? 0.8 : 0.15, 0, 1);
     }
-    return box;
-  }, [layout, focusContainer, matched, selected]);
+    return { box, facing: facing.lengthSq() ? facing.normalize() : new THREE.Vector3(0, 0, 1) };
+  }, [layout, containerById, focusContainer, matched, selected]);
 
   // La casa entera se mira más desde arriba: el piso llena la pantalla en vez de la pared vacía.
-  const whole = !selected && !matched.length && focusContainer === "all";
+  const whole = !selected && !matched.length && !(focusContainer !== "all" && containerById.has(focusContainer));
 
   useEffect(() => {
-    const center = frame.getCenter(new THREE.Vector3());
-    const extent = frame.getSize(new THREE.Vector3());
+    const center = frame.box.getCenter(new THREE.Vector3());
+    const sphere = frame.box.getBoundingSphere(new THREE.Sphere());
     const vfov = (camera.fov * Math.PI) / 180;
     const aspect = size.width / Math.max(1, size.height);
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-    const dist = Math.max(extent.x / 2 / Math.tan(hfov / 2), extent.y / 2 / Math.tan(vfov / 2)) * 1.0 + 0.05;
-    // Un poco desde arriba, para que se vea adentro de las cajas.
-    const target = center.clone();
-    const position = center.clone().add(new THREE.Vector3(0, dist * (whole ? 0.5 : 0.3), dist));
-    goal.current = { target, position };
+    const fov = Math.min(vfov, hfov);
+    // La esfera envolvente sobra en las esquinas de una caja: se la achica un poco.
+    const dist = (sphere.radius * (whole ? 0.72 : 0.9)) / Math.sin(fov / 2) + 0.05;
+    const dir = frame.facing.clone().setY(whole ? 0.4 : 0.32).normalize();
+    goal.current = { target: center, position: center.clone().add(dir.multiplyScalar(dist)) };
     invalidate();
   }, [frame, camera, size, invalidate, whole]);
 

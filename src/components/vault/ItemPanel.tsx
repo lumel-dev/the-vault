@@ -7,10 +7,13 @@ import { typeDef } from "@/lib/item-types";
 import type { VaultItem } from "@/lib/queries";
 import type { Whereabouts } from "@/lib/where";
 import { Cover } from "./Cover";
+import { SeasonsCheck } from "./SeasonsCheck";
 import { Sticker } from "./Sticker";
 
 interface Props {
   item: VaultItem;
+  /** Toda la colección: para saber qué otras temporadas de la serie tenés. */
+  collection: VaultItem[];
   where: Whereabouts;
   onClose: () => void;
   onEdit: () => void;
@@ -21,7 +24,11 @@ interface Props {
  * El objeto elegido: dónde está, en cinta de papel, y sus datos. No es un diálogo: queda al costado
  * mientras se sigue mirando el mueble (abajo, en el celular).
  */
-export function ItemPanel({ item, where, onClose, onEdit, onDelete }: Props) {
+export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }: Props) {
+  const tvId = item.type === "series" && item.externalSource === "tmdb" && item.externalId?.startsWith("tv:") ? Number(item.externalId.slice(3)) : null;
+  const owned = new Set(
+    collection.filter((i) => i.type === "series" && i.externalId === item.externalId && i.attributes.season).map((i) => Number(i.attributes.season)),
+  );
   const def = typeDef(item.type);
   const facts: [string, string][] = [];
   if (def.brandModel) {
@@ -71,6 +78,12 @@ export function ItemPanel({ item, where, onClose, onEdit, onDelete }: Props) {
           ))}
         </dl>
       )}
+
+      {tvId ? (
+        <SeasonsCheck tvId={tvId} owned={owned} />
+      ) : item.type === "series" ? (
+        <p className="mt-4 text-xs text-muted-foreground">Para saber qué temporadas te faltan, editala y elegila en TMDB.</p>
+      ) : null}
 
       {item.description && <p className="mt-4 line-clamp-6 text-sm leading-relaxed text-muted-foreground">{item.description}</p>}
 

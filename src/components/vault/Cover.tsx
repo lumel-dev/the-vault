@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { coverUrl, type CoverSize } from "@/lib/covers";
 import { cn } from "@/lib/utils";
 import { Sticker } from "./Sticker";
@@ -21,19 +21,35 @@ interface Props {
  */
 export function Cover({ type, name, coverSource, coverRef, size = "md", className }: Props) {
   const url = coverUrl(coverSource, coverRef, size);
-  const [failed, setFailed] = useState<string | null>(null);
-  const showImage = url && failed !== url;
+  // Un intento con la URL tal cual y otro con una URL distinta (por si la caché tiene una copia
+  // sin CORS de antes); recién si fallan los dos, la tapa genérica.
+  const [attempt, setAttempt] = useState<{ url: string | null; n: number }>({ url, n: 0 });
+  const n = attempt.url === url ? attempt.n : 0;
+  const src = url && n === 1 ? `${url}?cors=1` : url;
+  const showImage = url && n < 2;
+  const img = useRef<HTMLImageElement>(null);
+
+  // La imagen viene renderizada del server: si falló antes de que React hidratara, onError nunca
+  // llega. Al montar se mira si ya terminó sin pixeles y se reintenta igual.
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0 && url) setAttempt({ url, n: n + 1 });
+  }, [src, url, n]);
 
   return (
     <div className={cn("relative aspect-[2/3] overflow-hidden rounded-[3px] bg-[#161617]", className)}>
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- se sirve directo desde TMDB, sin optimizador
         <img
-          src={url}
+          ref={img}
+          src={src!}
           alt={`Tapa de ${name}`}
           loading="lazy"
+          // En modo CORS siempre: TMDB sólo manda el header CORS si el pedido trae Origin, y la
+          // copia que Chrome cachea de un <img> común después bloquea la textura del 3D.
+          crossOrigin="anonymous"
           draggable={false}
-          onError={() => setFailed(url)}
+          onError={() => setAttempt({ url, n: n + 1 })}
           className="size-full object-cover"
         />
       ) : (

@@ -406,6 +406,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
               <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 md:absolute md:inset-x-auto md:top-4 md:right-4 md:bottom-auto">
                 <ItemPanel
                   item={selected}
+                  collection={items}
                   where={whereabouts(selected, items, shelves)}
                   onClose={() => setSelectedId(null)}
                   onEdit={() => setItemDialog({ kind: "edit", item: selected })}

@@ -115,14 +115,23 @@ export interface PlacedContainer {
   levelClear: number;
   board: number;
   count: number;
+  /** Contra qué pared va: la de la izquierda o la del fondo (la habitación es una L). */
+  wall: "left" | "back";
+  /** Dónde queda en la habitación el punto local (x, 0, 0) del mueble, y cuánto está girado. */
+  origin: [number, number, number];
+  rotationY: number;
 }
 
 export interface SceneLayout {
   containers: PlacedContainer[];
   items: PlacedItem[];
   slots: Slot[];
+  /** Largo de la fila desplegada (todos los muebles uno al lado del otro). */
   width: number;
   height: number;
+  /** Cuánto ocupa cada pared, medido desde el rincón. */
+  leftLength: number;
+  backLength: number;
 }
 
 const GAP = 0.3;
@@ -136,6 +145,8 @@ const SHELF_DEPTH = 0.32;
 const BOX_WALL = 0.105;
 const TABLE_HEIGHT = 0.45;
 const TABLE_ROW = 1.6;
+/** Lo que se deja libre en el rincón para que los muebles de las dos paredes no se toquen. */
+export const CORNER = 0.42;
 
 function containerKind(kind: string): PlacedContainer["kind"] {
   return kind === "box" || kind === "cabinet" ? kind : "shelf";
@@ -193,7 +204,7 @@ export function buildLayout(containers: LayoutContainer[], allItems: LayoutItem[
         });
       });
       const width = inner + 2 * SIDE;
-      placedContainers.push({ id: c.id, name: c.name, kind, x: cursor, width, height: BOX_WALL, depth, levelFloors: [0.012], levelClear: BOX_WALL, board: SIDE, count: contents.length });
+      placedContainers.push({ id: c.id, name: c.name, kind, x: cursor, width, height: BOX_WALL, depth, levelFloors: [0.012], levelClear: BOX_WALL, board: SIDE, count: contents.length, wall: "back", origin: [0, 0, 0], rotationY: 0 });
       slots.push({ containerId: c.id, level: 0, x0: cursor, x1: cursor + width, y0: 0, y1: BOX_WALL + 0.25, z: depth / 2, edges, floor: 0.012 });
       cursor += width + GAP;
       maxHeight = Math.max(maxHeight, BOX_WALL);
@@ -234,7 +245,7 @@ export function buildLayout(containers: LayoutContainer[], allItems: LayoutItem[
       slots.push({ containerId: c.id, level, x0: cursor, x1: cursor + width, y0: floor, y1: floor + clear, z: depth / 2, edges, floor });
     });
 
-    placedContainers.push({ id: c.id, name: c.name, kind, x: cursor, width, height, depth, levelFloors, levelClear: clear, board: BOARD, count: contents.length });
+    placedContainers.push({ id: c.id, name: c.name, kind, x: cursor, width, height, depth, levelFloors, levelClear: clear, board: BOARD, count: contents.length, wall: "back", origin: [0, 0, 0], rotationY: 0 });
     cursor += width + GAP;
     maxHeight = Math.max(maxHeight, height);
   }
@@ -272,29 +283,101 @@ export function buildLayout(containers: LayoutContainer[], allItems: LayoutItem[
   });
   const firstRow = rows[0] ?? [];
   const tableEdges = row(firstRow.map((x) => x.dims), cursor + MARGIN).edges;
-  placedContainers.push({ id: null, name: "Sin ubicar", kind: "table", x: cursor, width: tableWidth, height: TABLE_HEIGHT, depth: tableDepth, levelFloors: [TABLE_HEIGHT], levelClear: 0.3, board: 0.03, count: loose.length });
+  placedContainers.push({ id: null, name: "Sin ubicar", kind: "table", x: cursor, width: tableWidth, height: TABLE_HEIGHT, depth: tableDepth, levelFloors: [TABLE_HEIGHT], levelClear: 0.3, board: 0.03, count: loose.length, wall: "back", origin: [0, 0, 0], rotationY: 0 });
   slots.push({ containerId: null, level: 0, x0: cursor, x1: cursor + tableWidth, y0: TABLE_HEIGHT - 0.1, y1: TABLE_HEIGHT + 0.32, z: tableDepth / 2, edges: tableEdges, floor: TABLE_HEIGHT });
   cursor += tableWidth;
   maxHeight = Math.max(maxHeight, TABLE_HEIGHT + 0.3);
 
-  return { containers: placedContainers, items: placedItems, slots, width: cursor, height: maxHeight };
+  const { leftLength, backLength } = foldIntoL(placedContainers);
+  return { containers: placedContainers, items: placedItems, slots, width: cursor, height: maxHeight, leftLength, backLength };
 }
 
-/** El estante bajo un punto del plano del frente, y en qué lugar caería algo soltado ahí. */
-export function dropTarget(layout: SceneLayout, x: number, y: number): { slot: Slot; index: number } | null {
-  for (const slot of layout.slots) {
-    if (x < slot.x0 || x > slot.x1 || y < slot.y0 || y > slot.y1) continue;
-    const edges = slot.edges;
-    // Hueco más cercano: entre el borde izquierdo de cada objeto y el derecho del último.
-    let index = edges.length - 1;
-    for (let i = 0; i < edges.length - 1; i++) {
-      const mid = (edges[i] + edges[i + 1]) / 2;
-      if (x < mid) {
-        index = i;
-        break;
+/**
+ * Pliega la fila de muebles en una L, como en una habitación: los primeros van contra la pared de
+ * la izquierda (de adelante hacia el rincón) y el resto contra la del fondo (del rincón hacia la
+ * derecha), con la mesa de "Sin ubicar" siempre al final. Así la casa entra en pantalla sin una
+ * fila de seis metros y la cámara la mira en diagonal, desde el centro de la habitación.
+ *
+ * Con menos de tres muebles no hay L: todo va contra el fondo.
+ *
+ * Paredes: la del fondo es el plano z = 0 y la de la izquierda el plano x = 0; el rincón es el
+ * origen. Cada mueble tiene su espalda pegada a su pared.
+ */
+function foldIntoL(containers: PlacedContainer[]): { leftLength: number; backLength: number } {
+  const furniture = containers.filter((c) => c.kind !== "table");
+  const total = containers.reduce((s, c) => s + c.width, 0) + GAP * Math.max(0, containers.length - 1);
+  let split = 0;
+  if (furniture.length >= 3) {
+    // Cuántos muebles van a la izquierda: los que dejan esa pared más cerca del 40 % del total,
+    // con al menos uno de cada lado.
+    let best = Infinity;
+    let length = 0;
+    for (let k = 1; k < furniture.length; k++) {
+      length += furniture[k - 1].width + (k > 1 ? GAP : 0);
+      const diff = Math.abs(length - total * 0.4);
+      if (diff < best) {
+        best = diff;
+        split = k;
       }
     }
-    return { slot, index };
   }
-  return null;
+
+  // Pared izquierda: el primero queda adelante y el último contra el rincón.
+  const left = containers.slice(0, split);
+  const leftLength = left.reduce((s, c) => s + c.width, 0) + GAP * Math.max(0, left.length - 1);
+  let along = CORNER + leftLength;
+  for (const c of left) {
+    c.wall = "left";
+    c.rotationY = Math.PI / 2;
+    // Girado 90°: el x local del mueble avanza hacia el rincón (z decrece) y su frente mira a +x.
+    c.origin = [c.depth / 2, 0, along];
+    along -= c.width + GAP;
+  }
+
+  let cursor = CORNER;
+  for (const c of containers.slice(split)) {
+    c.wall = "back";
+    c.rotationY = 0;
+    c.origin = [cursor, 0, c.depth / 2];
+    cursor += c.width + GAP;
+  }
+  return { leftLength: split ? CORNER + leftLength : 0, backLength: cursor - GAP };
+}
+
+type Vec3 = [number, number, number];
+
+/** Un punto en coordenadas de la fila (las de `PlacedItem.position`) a la habitación. */
+export function toWorld(c: PlacedContainer, p: Vec3): Vec3 {
+  const u = p[0] - c.x;
+  const cos = Math.cos(c.rotationY);
+  const sin = Math.sin(c.rotationY);
+  return [c.origin[0] + u * cos + p[2] * sin, c.origin[1] + p[1], c.origin[2] - u * sin + p[2] * cos];
+}
+
+/** Al revés: un punto de la habitación a las coordenadas de la fila de ese mueble. */
+export function toLocal(c: PlacedContainer, w: Vec3): Vec3 {
+  const dx = w[0] - c.origin[0];
+  const dz = w[2] - c.origin[2];
+  const cos = Math.cos(c.rotationY);
+  const sin = Math.sin(c.rotationY);
+  return [c.x + dx * cos - dz * sin, w[1] - c.origin[1], dx * sin + dz * cos];
+}
+
+/** Hacia dónde mira el frente de un mueble, en la habitación. */
+export function frontNormal(c: PlacedContainer): Vec3 {
+  return [Math.sin(c.rotationY), 0, Math.cos(c.rotationY)];
+}
+
+/** En qué lugar de un estante cae algo soltado a la altura `x` (coordenadas de la fila). */
+export function slotIndex(slot: Slot, x: number): number {
+  const edges = slot.edges;
+  // Hueco más cercano: entre el borde izquierdo de cada objeto y el derecho del último.
+  for (let i = 0; i < edges.length - 1; i++) if (x < (edges[i] + edges[i + 1]) / 2) return i;
+  return edges.length - 1;
+}
+
+/** El estante bajo un punto del frente de los muebles (coordenadas de la fila), y el lugar. */
+export function dropTarget(layout: SceneLayout, x: number, y: number): { slot: Slot; index: number } | null {
+  const slot = layout.slots.find((s) => x >= s.x0 && x <= s.x1 && y >= s.y0 && y <= s.y1);
+  return slot ? { slot, index: slotIndex(slot, x) } : null;
 }

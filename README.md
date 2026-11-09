@@ -4,7 +4,7 @@ Una web app para llevar el inventario de lo que tenés y saber dónde está: pel
 DVD, libros, música, juegos o cualquier otra cosa. Cada persona tiene su cuenta y su colección.
 
 La colección se ve de dos maneras. **Mueble** es la casa en 3D: tus estanterías, cajas y muebles
-con puertas, con cada cosa en su lugar y con su forma real (una caja de DVD de 14 mm, un Blu-ray
+con puertas acomodados en L contra dos paredes, con cada cosa en su lugar y con su forma real (una caja de DVD de 14 mm, un Blu-ray
 más bajo, un vinilo, un libro). Los DVDs se ven de lomo; al tocar uno se desliza afuera y gira
 mostrando la tapa. **Grilla** es la vista plana de tapas, para cargar y buscar rápido.
 
@@ -40,6 +40,8 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está sólo en español.
 - **Ordenar** por nombre (sin contar "El", "La", "The"…), género, tipo o año. En la grilla ordena
   lo que ves; en el mueble, con un contenedor elegido, "Acomodar así" lo ordena de verdad, estante
   por estante, como se ordena a mano.
+- **Temporadas que faltan**: en una serie cargada desde TMDB, la ficha dice cuántas temporadas
+  salieron y cuáles no tenés, contando todas las que hay en la casa.
 - **Sacar de la bóveda** tacha el objeto con fibrón y deja 5 segundos para deshacer.
 
 ## Agregar un tipo o un campo
@@ -104,6 +106,8 @@ dueño de la base, porque la primera migración crea las extensiones `pg_trgm` y
 
 - **Las tapas se piden a TMDB desde el browser de cada usuario**: si TMDB no responde, se ve la
   tapa genérica. La app sólo guarda el path (`/abc.jpg`) y nunca acepta URLs completas.
+- **Las tapas se piden siempre en modo CORS** (`crossOrigin`): TMDB sólo manda el header CORS si
+  el pedido trae `Origin`, y una copia cacheada sin él bloquea después la textura del 3D.
 - **La colección entera viaja al browser** (búsqueda, orden y 3D corren ahí). Está pensado para
   colecciones de cientos de objetos; con varios miles conviene paginar la grilla y revisar el 3D.
 - **El 3D se baja aparte**: la grilla y la búsqueda funcionan aunque el mueble todavía se esté

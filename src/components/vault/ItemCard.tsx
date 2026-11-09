@@ -61,7 +61,7 @@ export function ItemCard({ item, onOpen, striking, selected, sortable = true, ca
       <button
         type="button"
         onClick={() => onOpen(item)}
-        className="block w-full cursor-grab rounded-[3px] text-left outline-none focus-visible:ring-3 focus-visible:ring-marker active:cursor-grabbing"
+        className="block w-full cursor-pointer rounded-[3px] text-left outline-none focus-visible:ring-3 focus-visible:ring-marker active:cursor-grabbing"
         aria-label={`${item.name}. Enter para ver dónde está; espacio para arrastrar.`}
         {...attributes}
         {...listeners}

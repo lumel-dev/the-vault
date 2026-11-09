@@ -281,6 +281,7 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
 
     const begin = (clientX: number, clientY: number) => {
       started = true;
+      document.body.style.cursor = "grabbing";
       if (controls) controls.enabled = false;
       const p = project(clientX, clientY);
       setDrag({ id, point: p?.point ?? grabbedWorld.clone(), target: p?.target ?? null });
@@ -308,6 +309,7 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
       if (controls) controls.enabled = true;
+      if (started) document.body.style.cursor = "";
       if (!started) {
         if (!cancelled && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 8) onSelect(id === selectedId ? null : id);
         return;
@@ -556,7 +558,7 @@ function ItemMesh({
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
-          document.body.style.cursor = "grab";
+          document.body.style.cursor = "pointer";
         }}
         onPointerOut={() => {
           setHovered(false);
@@ -652,6 +654,17 @@ function Furniture({ container: c, mats, open, onSelect }: { container: PlacedCo
   return <Shelving c={c} mats={mats} label={label} open={open} onClick={click} />;
 }
 
+/** Los muebles se pueden tocar (llevan la cámara hasta ellos): la manito lo avisa. */
+const pointerCursor = {
+  onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    document.body.style.cursor = "pointer";
+  },
+  onPointerOut: () => {
+    if (document.body.style.cursor === "pointer") document.body.style.cursor = "";
+  },
+};
+
 function Board({ size, position, material }: { size: [number, number, number]; position: [number, number, number]; material: THREE.Material }) {
   return (
     <mesh position={position} material={material} castShadow receiveShadow>
@@ -671,7 +684,7 @@ function Shelving({ c, mats, label, open, onClick }: { c: PlacedContainer; mats:
   const lowest = c.levelFloors[c.levelFloors.length - 1] - board;
   const doorH = h - board - lowest;
   return (
-    <group onClick={onClick}>
+    <group onClick={onClick} {...pointerCursor}>
       {/* laterales, techo, zócalo y fondo */}
       <Board size={[board, top, d]} position={[x + board / 2, top / 2, 0]} material={mats.wood} />
       <Board size={[board, top, d]} position={[x + w - board / 2, top / 2, 0]} material={mats.wood} />
@@ -737,7 +750,7 @@ function Box({ c, mats, label, onClick }: { c: PlacedContainer; mats: Materials;
   const long = Math.min(d / 2, h * 0.55);
   const short = d / 2 - 0.01;
   return (
-    <group onClick={onClick}>
+    <group onClick={onClick} {...pointerCursor}>
       <Board size={[w, wall, d]} position={[cx, wall / 2, 0]} material={mats.kraft} />
       <Board size={[w, h, wall]} position={[cx, h / 2, d / 2 - wall / 2]} material={mats.kraft} />
       <Board size={[w, h, wall]} position={[cx, h / 2, -d / 2 + wall / 2]} material={mats.kraft} />
@@ -777,7 +790,7 @@ function Table({ c, mats, onClick }: { c: PlacedContainer; mats: Materials; onCl
   const cx = x + w / 2;
   const leg = 0.035;
   return (
-    <group onClick={onClick}>
+    <group onClick={onClick} {...pointerCursor}>
       <Board size={[w, board, d]} position={[cx, h - board / 2, 0]} material={mats.wood} />
       {[
         [x + leg, d / 2 - leg],

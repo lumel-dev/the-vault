@@ -24,6 +24,8 @@ export interface ItemTypeDef {
   plural: string;
   /** Qué búsqueda de TMDB usa para sugerir datos y tapa. */
   tmdb?: "movie" | "tv";
+  /** El catálogo abierto donde se buscan los que no están en TMDB. Ver `src/lib/catalogs.ts`. */
+  catalog?: "books" | "albums";
   /** Si las columnas marca/modelo tienen sentido para este tipo. */
   brandModel: boolean;
   fields: readonly AttributeField[];
@@ -56,6 +58,7 @@ export const ITEM_TYPES = {
   book: {
     label: "Libro",
     plural: "Libros",
+    catalog: "books",
     brandModel: false,
     fields: [
       { key: "author", label: "Autor", kind: "text" },
@@ -68,6 +71,7 @@ export const ITEM_TYPES = {
   music: {
     label: "Música",
     plural: "Música",
+    catalog: "albums",
     brandModel: false,
     fields: [
       { key: "artist", label: "Artista", kind: "text" },

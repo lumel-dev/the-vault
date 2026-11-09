@@ -33,7 +33,7 @@ export function ItemDialog({ mode, shelves, tmdbEnabled, onClose }: Props) {
           <>
             <DialogHeader>
               <DialogTitle>Agregar a la bóveda</DialogTitle>
-              <DialogDescription>Buscalo en TMDB para traer la tapa, o cargalo a mano. Cada cosa nueva recibe su número de inventario.</DialogDescription>
+              <DialogDescription>Buscalo para traer los datos y la tapa (películas y series en TMDB, libros en Open Library, discos en MusicBrainz) o cargalo a mano. Cada cosa nueva recibe su número de inventario.</DialogDescription>
             </DialogHeader>
             <ItemForm defaultType={mode.type} defaultShelfId={mode.shelfId} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
           </>

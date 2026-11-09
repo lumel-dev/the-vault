@@ -1,0 +1,52 @@
+name: CI
+
+# Solo en PRs (incluidos los de Dependabot): el push a main ya dispara el deploy y la
+# org esta en el plan Free de Actions, asi que no gastamos minutos dos veces.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Postgres para los tests de integración: las migraciones de drizzle/ se aplican igual que
+    # al arrancar en producción, y las server actions corren contra esa base.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: the_vault_test
+        ports:
+          - 55438:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d the_vault_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm run test
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:55438/the_vault_test
+      - run: pnpm run build

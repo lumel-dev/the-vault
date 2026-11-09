@@ -1,0 +1,80 @@
+# Config unificada de Dependabot de lumel.dev (reemplaza a Renovate).
+# Criterio: minors y patches agrupados en un PR por semana; los majors llegan de a
+# uno y se revisan a mano. Los fixes de seguridad entran apenas salen.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 5
+    assignees:
+      - jlumel
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # Next y eslint-config-next tienen que subir juntos.
+      next:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
+          - "babel-plugin-react-compiler"
+      # React, react-dom y sus tipos, en un solo PR.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Tailwind y su plugin de postcss van en la misma versión.
+      tailwind:
+        patterns:
+          - "tailwindcss"
+          - "@tailwindcss/*"
+      # Todo lo demás que no sea major, junto.
+      minor-y-patch:
+        update-types: [minor, patch]
+        exclude-patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
+          - "babel-plugin-react-compiler"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "tailwindcss"
+          - "@tailwindcss/*"
+    ignore:
+      # @types/node: sigue al Node del Dockerfile/.nvmrc (26), no al último major.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+      # typescript: los majors rompen typescript-eslint, se migra a mano.
+      - dependency-name: "typescript"
+        update-types: [version-update:semver-major]
+      # next-auth: v5 sigue en beta, el bump lo decidimos nosotros.
+      - dependency-name: "next-auth"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      # Diario: la imagen base va con el patch exacto (ej. node:26.13.0-alpine) para
+      # que cada release de Node/Python, casi siempre de seguridad, llegue como PR
+      # apenas sale. El tag exacto obliga además a Coolify a bajar la imagen nueva.
+      interval: daily
+      time: "06:00"
+      timezone: America/Argentina/Buenos_Aires
+    assignees:
+      - jlumel
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Node se sube a mano y solo a LTS, junto con @types/node, .nvmrc y engines.
+      - dependency-name: "node"
+        update-types: [version-update:semver-major]

@@ -1,0 +1,17 @@
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  sharp: false
+
+# pnpm 12 escribe un documento "env" (pnpm mismo) al principio del lockfile y el dependency
+# graph de GitHub sólo lee el primero: Dependabot y las alertas quedan ciegos. Esto lo
+# apaga, a cambio de que pnpm no cambie solo a la versión de `packageManager`
+# (Docker/corepack y la CI la leen igual). https://github.com/dependabot/dependabot-core/issues/15904
+pmOnFail: ignore
+
+# Vulnerabilidades en dependencias transitivas que el padre todavía no sube: forzamos la
+# versión parcheada. Sacar la línea cuando el padre ya traiga una versión igual o mayor.
+overrides:
+  # GHSA-67mh-4wv8-2f99: drizzle-kit > @esbuild-kit/core-utils pide esbuild ~0.18.20. Lo alineo
+  # con el esbuild ^0.25 que drizzle-kit ya usa directo.
+  "@esbuild-kit/core-utils>esbuild": ^0.25.12

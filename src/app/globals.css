@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+/* Variantes `data-*` de shadcn, necesarias para las primitivas `base-nova`. Cada una cubre los
+ * dos dialectos: `data-state="open"` (Radix) y `data-open` (Base UI, que es lo que usamos).
+ * Un componente copiado de un shadcn de Radix compila igual y falla en runtime si falta el
+ * dialecto que le toca. */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-checked {
+  &:where([data-state="checked"]),
+  &:where([data-checked]:not([data-checked="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-unchecked {
+  &:where([data-state="unchecked"]),
+  &:where([data-unchecked]:not([data-unchecked="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
+/* La app es oscura y nada más: es una vitrina de tapas, y los posters lucen sobre fondo oscuro.
+ * `color-scheme: dark` hace que los controles nativos (scrollbars, selects) acompañen. */
+@theme inline {
+  --font-sans: var(--font-sans-app);
+  --font-display: var(--font-display-app);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  color-scheme: dark;
+  --radius: 0.625rem;
+
+  /* Acero oscuro con un dorado de bóveda como único acento. */
+  --background: oklch(0.16 0.008 260);
+  --foreground: oklch(0.95 0.005 260);
+  --card: oklch(0.205 0.01 260);
+  --card-foreground: oklch(0.95 0.005 260);
+  --popover: oklch(0.22 0.01 260);
+  --popover-foreground: oklch(0.95 0.005 260);
+  --primary: oklch(0.8 0.13 80);
+  --primary-foreground: oklch(0.2 0.02 80);
+  --secondary: oklch(0.26 0.012 260);
+  --secondary-foreground: oklch(0.95 0.005 260);
+  --muted: oklch(0.25 0.01 260);
+  --muted-foreground: oklch(0.7 0.012 260);
+  --accent: oklch(0.28 0.014 260);
+  --accent-foreground: oklch(0.97 0.005 260);
+  --destructive: oklch(0.65 0.2 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.8 0.13 80 / 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* Filas que se deslizan con el dedo (estantes y tipos en el celular): sin barra de scroll, que en
+ * Windows se dibuja gruesa debajo de cada una. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

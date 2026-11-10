@@ -1,0 +1,3 @@
+# The Vault es una app privada: cada colección es de su usuario. Nada para indexar.
+User-agent: *
+Disallow: /

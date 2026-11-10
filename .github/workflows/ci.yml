@@ -50,3 +50,9 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:55438/the_vault_test
       - run: pnpm run build
+
+      # La imagen de producción, igual que la arma Coolify: con lo que hay en git y nada más. Un
+      # archivo que existe en la máquina de alguien pero no en el repo (la carpeta public/ vacía,
+      # que git no guarda) rompía el deploy sin que nada lo avisara antes del merge.
+      - name: Imagen Docker
+        run: git archive HEAD | docker build -t the-vault:ci -

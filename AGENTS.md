@@ -139,6 +139,13 @@ SQL; hoy no la usa la app.
 - Lo elegido nunca se apaga por la búsqueda (si no, su tapa quedaba casi invisible).
 - El 3D no es accesible por teclado: todo lo que hace tiene equivalente en la grilla.
 
+## Deploy
+
+- Coolify arma la imagen con el `Dockerfile` a partir de lo que hay en git. **Git no guarda carpetas
+  vacías**: `public/` tiene que tener al menos un archivo (`robots.txt`) o el `COPY` del Dockerfile
+  falla. La CI construye la imagen con `git archive HEAD | docker build -` para detectar esto antes
+  del merge.
+
 ## Migraciones
 
 - Se generan con `pnpm db:generate` y se commitean en `drizzle/`. **No se usa `db:push`.**

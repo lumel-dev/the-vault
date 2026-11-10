@@ -30,12 +30,16 @@ const itemSchema = z.object({
   attributes: z.record(z.string(), z.unknown()).default({}),
   coverSource: z.string().nullish(),
   coverRef: z.string().nullish(),
-  externalSource: z.literal("tmdb").nullish(),
-  externalId: z
-    .string()
-    .regex(/^(movie|tv):\d{1,10}$/)
-    .nullish(),
+  externalSource: z.enum(["tmdb", "openlibrary", "musicbrainz"]).nullish(),
+  externalId: z.string().max(80).nullish(),
 });
+
+/** Cómo es el id de cada catálogo: "movie:603", "work:OL14860424W", "release-group:<mbid>". */
+const EXTERNAL_ID: Record<string, RegExp> = {
+  tmdb: /^(movie|tv):\d{1,10}$/,
+  openlibrary: /^work:OL\d{1,12}W$/,
+  musicbrainz: /^release-group:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+};
 
 export type ItemInput = z.input<typeof itemSchema>;
 
@@ -62,7 +66,7 @@ async function resolveLevel(userId: string, shelfId: string | null, level: numbe
 
 function toValues(data: z.output<typeof itemSchema>) {
   const coverOk = isValidCover(data.coverSource, data.coverRef);
-  const externalOk = Boolean(data.externalSource && data.externalId);
+  const externalOk = Boolean(data.externalSource && data.externalId && EXTERNAL_ID[data.externalSource]?.test(data.externalId));
   return {
     type: data.type,
     name: data.name,

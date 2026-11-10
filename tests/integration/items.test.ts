@@ -68,6 +68,36 @@ describe("items", { skip: sinBase }, () => {
     assert.equal(item.coverRef, null);
   });
 
+  it("guarda libros y discos con su catálogo y su tapa, y descarta ids mal formados", async () => {
+    ok(
+      await createItem({
+        type: "book",
+        name: "Rayuela",
+        attributes: { author: "Julio Cortázar" },
+        coverSource: "openlibrary",
+        coverRef: "1047466",
+        externalSource: "openlibrary",
+        externalId: "work:OL14860424W",
+      }),
+    );
+    ok(
+      await createItem({
+        type: "music",
+        name: "Artaud",
+        coverSource: "coverartarchive",
+        coverRef: "8e50433a-c1d5-3019-a48d-0d6b97a5f32b",
+        externalSource: "musicbrainz",
+        externalId: "tv:123",
+      }),
+    );
+    const [disco, libro] = await listItems(ana);
+    assert.equal(libro.externalId, "work:OL14860424W");
+    assert.equal(libro.coverRef, "1047466");
+    assert.equal(disco.coverSource, "coverartarchive");
+    // Un id que no es de MusicBrainz no se guarda como si lo fuera.
+    assert.equal(disco.externalId, null);
+  });
+
   it("el estante se ajusta a los que tiene el contenedor", async () => {
     const caja = ok(await createShelf({ name: "Caja 3", kind: "box", levels: 5 })).id;
     const mueble = ok(await createShelf({ name: "Living", kind: "shelf", levels: 3 })).id;

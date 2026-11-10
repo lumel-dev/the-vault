@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { createItem, updateItem, type ItemInput } from "@/lib/actions/items";
+import { searchCatalogAction } from "@/lib/actions/catalogs";
 import { movieDetailsAction, searchTmdbAction, tvSeasonsAction } from "@/lib/actions/tmdb";
+import type { CatalogResult } from "@/lib/catalogs";
 import { inventoryLabel } from "@/lib/containers";
 import { ITEM_TYPE_KEYS, ITEM_TYPES, typeDef, type ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
@@ -47,7 +49,10 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
   const [cover, setCover] = useState<CoverRef | null>(
     item?.coverSource && item.coverRef ? { source: item.coverSource, ref: item.coverRef } : null,
   );
-  const [external, setExternal] = useState<string | null>(item?.externalSource === "tmdb" ? item.externalId : null);
+  // De qué catálogo salió (TMDB, Open Library, MusicBrainz) y su id ahí.
+  const [external, setExternal] = useState<{ source: string; id: string } | null>(
+    item?.externalSource && item.externalId ? { source: item.externalSource, id: item.externalId } : null,
+  );
   const [pending, startTransition] = useTransition();
 
   const def = typeDef(type);
@@ -84,8 +89,8 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
       attributes: attrs,
       coverSource: cover?.source ?? null,
       coverRef: cover?.ref ?? null,
-      externalSource: external ? "tmdb" : null,
-      externalId: external,
+      externalSource: (external?.source as ItemInput["externalSource"]) ?? null,
+      externalId: external?.id ?? null,
     };
     startTransition(async () => {
       if (item) {
@@ -116,7 +121,27 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
             setAttrs((a) => ({ ...a, ...pick.attributes }));
             if (pick.overview && !description.trim()) setDescription(pick.overview);
             setCover(pick.posterPath ? { source: "tmdb", ref: pick.posterPath } : null);
-            setExternal(pick.externalId);
+            setExternal({ source: "tmdb", id: pick.externalId });
+          }}
+        />
+      )}
+      {def.catalog && (
+        <CatalogPicker
+          key={`${type}-${round}`}
+          catalog={def.catalog}
+          initialQuery={name}
+          onPick={(r) => {
+            setName(r.title);
+            // Lo que trae el catálogo pisa lo que estaba; el formato elegido queda.
+            setAttrs((a) => {
+              // El formato elegido queda si vale para este tipo (el form arranca en DVD, que no es
+              // un formato de música); si no, el primero de la lista (CD para un disco).
+              const options = def.fields.find((f) => f.key === "format")?.options;
+              const format = options ? (a.format && options.includes(a.format) ? a.format : options[0]) : undefined;
+              return { ...(format ? { format } : {}), ...r.attributes };
+            });
+            setCover(r.cover);
+            setExternal({ source: r.catalog, id: r.externalId });
           }}
         />
       )}
@@ -423,6 +448,89 @@ function TmdbPicker({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Buscar un libro en Open Library o un disco en MusicBrainz: trae título, autor o artista, año y
+ * tapa (la tapa de los discos la sirve Cover Art Archive y a veces no existe: se ve la genérica).
+ */
+function CatalogPicker({
+  catalog,
+  initialQuery,
+  onPick,
+}: {
+  catalog: "books" | "albums";
+  initialQuery: string;
+  onPick: (r: CatalogResult & { catalog: "openlibrary" | "musicbrainz" }) => void;
+}) {
+  const [query, setQuery] = useState(initialQuery);
+  const [results, setResults] = useState<CatalogResult[] | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
+  const books = catalog === "books";
+
+  function search(e?: React.SyntheticEvent) {
+    e?.preventDefault();
+    if (!query.trim()) return;
+    startSearch(async () => {
+      const res = await searchCatalogAction(catalog, query);
+      if (!res.ok) return void toast.error(res.error);
+      setResults(res.data);
+    });
+  }
+
+  return (
+    <div className="grid gap-3 rounded-xl border bg-background/40 p-3">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && search(e)}
+            placeholder={books ? "Buscá el libro en Open Library (título, autor o ISBN)" : "Buscá el disco en MusicBrainz (álbum y artista)"}
+            className="pl-8"
+            aria-label={books ? "Buscar en Open Library" : "Buscar en MusicBrainz"}
+          />
+        </div>
+        <Button type="button" variant="secondary" onClick={search} disabled={searching || !query.trim()}>
+          {searching ? <Loader2 className="animate-spin" /> : "Buscar"}
+        </Button>
+      </div>
+
+      {results && (
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{results.length ? "Elegí el que es:" : "No encontré nada con ese nombre."}</span>
+            <button type="button" onClick={() => setResults(null)} aria-label="Cerrar resultados" className="hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          </div>
+          {results.length > 0 && (
+            <ul className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
+              {results.map((r) => (
+                <li key={r.externalId}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPicked(r.externalId);
+                      onPick({ ...r, catalog: books ? "openlibrary" : "musicbrainz" });
+                      setResults(null);
+                    }}
+                    className={cn("w-full rounded-md p-1 text-left transition hover:bg-accent", picked === r.externalId && "bg-accent ring-1 ring-primary")}
+                  >
+                    <Cover type={books ? "book" : "music"} name={r.title} coverSource={r.cover?.source} coverRef={r.cover?.ref} size="sm" />
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-tight font-medium">{r.title}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">{[r.by, r.year].filter(Boolean).join(" · ")}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

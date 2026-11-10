@@ -20,7 +20,30 @@ Next 16 App Router (RSC + Server Actions, React Compiler) · React 19 · three.j
 + drei · Drizzle + `postgres-js` · Auth.js v5 beta (Credentials, JWT, scrypt) · Zod 4 · Tailwind v4
 · shadcn/ui estilo `base-nova` (Base UI, no Radix) · dnd-kit (`core` + `sortable`) · sonner.
 
-Sin i18n: textos en castellano inline. Un solo tema, claro (no hay `next-themes`).
+Un solo tema, claro (no hay `next-themes`).
+
+## Idiomas (es/en)
+
+- **Ningún texto de interfaz va inline**: todo está en `src/lib/i18n/es.ts` y `en.ts`. `en` tiene el
+  tipo de `es`, así que una clave que falte no compila, y `tests/unit/i18n.test.ts` verifica que
+  coincidan. Los textos con datos son funciones (`t.toast.moved(item, lugar)`).
+- El idioma es del usuario (`users.locale`) y se cambia con `setLocaleAction`; antes de entrar sale
+  del `Accept-Language`. En el server: `getMessages()` / `getUserLocale()`
+  (`src/lib/i18n/server.ts`); en el cliente: `useI18n()`. El diccionario no viaja como prop del
+  server al cliente porque tiene funciones. El canvas 3D es otro árbol de React: recibe `t` como
+  prop.
+- Las server actions devuelven los errores en el idioma del usuario (`session()` en cada archivo).
+- **Los datos de catálogo se guardan en los dos idiomas**: `items.translations` tiene `{ es, en }`
+  con título, sinopsis, género y tapa (TMDB tiene un póster por idioma). `localize()`
+  (`src/lib/localized.ts`) elige qué mostrar; `VaultApp` usa la versión localizada para mostrar y
+  `items` crudo para guardar. Al editar, lo cargado en el formulario pisa sólo el idioma del
+  usuario.
+- `completeTranslations` completa en segundo plano, de a 12, lo cargado desde TMDB sin
+  traducciones; `VaultApp` la llama al abrir mientras queden.
+- Los valores de las listas (formato: "Vinilo", "Casete") se guardan en castellano y se muestran
+  con `t.options[valor]`: cambiar el idioma no cambia datos.
+- Un elemento armado en el server y pasado como prop a un componente cliente (el botón de salir)
+  lleva `key`: si no, React avisa al re-renderizar después de cambiar el idioma.
 
 ## Diseño (impeccable)
 
@@ -52,6 +75,8 @@ contrato; uno que lo cambia, lo actualiza.
   copia sin el header, la textura del 3D queda bloqueada. `Cover` y `useCover` reintentan una vez
   con `?cors=1` (otra entrada de caché), y `Cover` revisa al montar si la imagen ya falló antes de
   hidratar, porque ese `onError` React no lo ve.
+- **TMDB siempre con idioma**: `es-MX` o `en-US` según `TMDB_LANGUAGE` en `src/lib/i18n` (ya no
+  es una variable de entorno).
 - **TMDB sólo desde el server** (`src/lib/tmdb.ts`, expuesto por `src/lib/actions/tmdb.ts`): el
   token nunca llega al browser. Las tapas sí se piden desde el browser (TMDB manda CORS `*`, que
   es lo que permite usarlas como textura en WebGL).

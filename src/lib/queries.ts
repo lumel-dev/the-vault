@@ -27,6 +27,7 @@ export async function listItems(userId: string) {
       brand: items.brand,
       model: items.model,
       attributes: items.attributes,
+      translations: items.translations,
       coverSource: items.coverSource,
       coverRef: items.coverRef,
       externalSource: items.externalSource,

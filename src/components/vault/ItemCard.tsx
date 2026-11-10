@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { inventoryLabel } from "@/lib/containers";
 import { subtitle } from "@/lib/item-types";
 import type { VaultItem } from "@/lib/queries";
+import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Cover } from "./Cover";
 import { Sticker } from "./Sticker";
@@ -14,8 +15,9 @@ import { Sticker } from "./Sticker";
  * color, así la grilla densa se lee pareja (lo que el mundo tomó del horario de bolsillo).
  */
 export function ItemCardBody({ item, lifted = false, striking = false, selected = false, caption }: { item: VaultItem; lifted?: boolean; striking?: boolean; selected?: boolean; caption?: string }) {
+  const { t } = useI18n();
   // Con la grilla ordenada por género o año, la línea chica muestra eso: así se ve el agrupamiento.
-  const sub = caption ?? subtitle(item.type, item.attributes, item.brand, item.model);
+  const sub = caption ?? subtitle(item.type, item.attributes, t, item.brand, item.model);
   return (
     <div className="group/card relative">
       <div className="relative">
@@ -40,7 +42,7 @@ export function ItemCardBody({ item, lifted = false, striking = false, selected 
         <p className="line-clamp-2 font-semibold">{item.name}</p>
         <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
           <Sticker type={item.type} className="size-2.5" />
-          <span className="truncate">{sub || inventoryLabel(item.inventoryNumber)}</span>
+          <span className="truncate">{sub || inventoryLabel(item.inventoryNumber, t)}</span>
         </p>
       </div>
     </div>
@@ -51,6 +53,7 @@ export function ItemCardBody({ item, lifted = false, striking = false, selected 
 export function ItemCard({ item, onOpen, striking, selected, sortable = true, caption }: { item: VaultItem; onOpen: (item: VaultItem) => void; striking: boolean; selected: boolean; sortable?: boolean; caption?: string }) {
   // Con la grilla ordenada por nombre, año, etc. no se reordena a mano: el orden lo da el criterio.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: !sortable });
+  const { t } = useI18n();
 
   return (
     <li
@@ -62,7 +65,7 @@ export function ItemCard({ item, onOpen, striking, selected, sortable = true, ca
         type="button"
         onClick={() => onOpen(item)}
         className="block w-full cursor-pointer rounded-[3px] text-left outline-none focus-visible:ring-3 focus-visible:ring-marker active:cursor-grabbing"
-        aria-label={`${item.name}. Enter para ver dónde está; espacio para arrastrar.`}
+        aria-label={t.grid.cardAria(item.name)}
         {...attributes}
         {...listeners}
       >

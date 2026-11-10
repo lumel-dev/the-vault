@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { inventoryLabel } from "@/lib/containers";
 import { typeDef } from "@/lib/item-types";
 import type { VaultItem } from "@/lib/queries";
+import { useI18n } from "@/lib/i18n/client";
 import type { Whereabouts } from "@/lib/where";
 import { Cover } from "./Cover";
 import { SeasonsCheck } from "./SeasonsCheck";
@@ -30,19 +31,20 @@ export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }
     collection.filter((i) => i.type === "series" && i.externalId === item.externalId && i.attributes.season).map((i) => Number(i.attributes.season)),
   );
   const def = typeDef(item.type);
+  const { t } = useI18n();
   const facts: [string, string][] = [];
   if (def.brandModel) {
-    if (item.brand) facts.push(["Marca", item.brand]);
-    if (item.model) facts.push(["Modelo", item.model]);
+    if (item.brand) facts.push([t.panel.brand, item.brand]);
+    if (item.model) facts.push([t.panel.model, item.model]);
   }
   for (const f of def.fields) {
     const v = item.attributes[f.key];
-    if (v) facts.push([f.label, v]);
+    if (v) facts.push([t.fields[f.key], f.kind === "select" ? (t.options[v] ?? v) : v]);
   }
 
   return (
     <aside
-      aria-label={`${item.name}, dónde está`}
+      aria-label={t.panel.aria(item.name)}
       className="pointer-events-auto max-h-[min(70dvh,44rem)] w-full overflow-y-auto rounded-t-xl bg-card p-5 shadow-[0_-8px_30px_-10px_rgb(28_27_25/45%)] md:w-80 md:rounded-xl md:shadow-[0_18px_40px_-16px_rgb(28_27_25/55%)]"
     >
       <div className="flex items-start gap-4">
@@ -50,14 +52,14 @@ export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }
         <div className="min-w-0 flex-1">
           <h2 className="text-lg leading-tight font-bold text-balance">
             {item.name}
-            {item.type === "series" && item.attributes.season ? ` · T${item.attributes.season}` : ""}
+            {item.type === "series" && item.attributes.season ? ` · ${t.seasonShort(item.attributes.season)}` : ""}
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Sticker type={item.type} className="size-2.5" />
-            {def.label} · <span className="tabular-nums">{inventoryLabel(item.inventoryNumber)}</span>
+            {t.types[item.type as keyof typeof t.types]?.label ?? item.type} · <span className="tabular-nums">{inventoryLabel(item.inventoryNumber, t)}</span>
           </p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Cerrar" className="-mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label={t.common.close} className="-mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
           <X className="size-4" />
         </button>
       </div>
@@ -82,7 +84,7 @@ export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }
       {tvId ? (
         <SeasonsCheck tvId={tvId} owned={owned} />
       ) : item.type === "series" ? (
-        <p className="mt-4 text-xs text-muted-foreground">Para saber qué temporadas te faltan, editala y elegila en TMDB.</p>
+        <p className="mt-4 text-xs text-muted-foreground">{t.panel.linkSeries}</p>
       ) : null}
 
       {item.description && <p className="mt-4 line-clamp-6 text-sm leading-relaxed text-muted-foreground">{item.description}</p>}
@@ -90,11 +92,11 @@ export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }
       <div className="mt-5 flex gap-2">
         <Button variant="secondary" onClick={onEdit}>
           <Pencil />
-          Editar
+          {t.common.edit}
         </Button>
         <Button variant="ghost" onClick={onDelete}>
           <Trash2 />
-          Sacar de la bóveda
+          {t.panel.remove}
         </Button>
       </div>
     </aside>

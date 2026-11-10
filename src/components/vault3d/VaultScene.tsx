@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three/addons/controls/OrbitControls.js";
 import { coverUrl } from "@/lib/covers";
+import type { Messages } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n/client";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import { buildLayout, frontNormal, slotIndex, toLocal, toWorld, type PlacedContainer, type PlacedItem, type SceneLayout, type Slot } from "@/lib/scene-layout";
 import {
@@ -87,6 +89,8 @@ function useMaterials(): Materials {
 /* ------------------------------------------------------------------ escena */
 
 export default function VaultScene(props: VaultSceneProps) {
+  // El canvas es otro árbol de React: el diccionario entra como prop, no por contexto.
+  const { t } = useI18n();
   const [coarse] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
   return (
     <Canvas
@@ -96,16 +100,16 @@ export default function VaultScene(props: VaultSceneProps) {
       camera={{ fov: 34, near: 0.05, far: 80, position: [4, 2.5, 4] }}
       onPointerMissed={() => props.onSelect(null)}
       gl={{ antialias: true, preserveDrawingBuffer: false }}
-      aria-label="Los muebles de la colección en 3D. Para hacer todo con teclado, usá la vista Grilla."
+      aria-label={t.scene.ariaLabel}
     >
       <color attach="background" args={[PALETTE.concrete]} />
       <fog attach="fog" args={[PALETTE.concrete, 9, 26]} />
-      <Contents {...props} coarse={coarse} />
+      <Contents {...props} coarse={coarse} t={t} />
     </Canvas>
   );
 }
 
-function Contents({ shelves, items, matches, selectedId, focusContainer, pendingDelete, onSelect, onSelectContainer, onPlace, coarse }: VaultSceneProps & { coarse: boolean }) {
+function Contents({ shelves, items, matches, selectedId, focusContainer, pendingDelete, onSelect, onSelectContainer, onPlace, coarse, t }: VaultSceneProps & { coarse: boolean; t: Messages }) {
   const mats = useMaterials();
   const layout = useMemo(() => buildLayout(shelves, items), [shelves, items]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -170,7 +174,7 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
           // Cada mueble se dibuja en sus coordenadas de fila y este grupo lo lleva a su pared.
           <group key={c.id ?? "loose"} position={c.origin} rotation={[0, c.rotationY, 0]}>
             <group position={[-c.x, 0, 0]}>
-              <Furniture container={c} mats={mats} open={drag !== null || openContainers.has(c.id)} onSelect={() => onSelectContainer(c.id)} />
+              <Furniture container={c} mats={mats} t={t} open={drag !== null || openContainers.has(c.id)} onSelect={() => onSelectContainer(c.id)} />
               {atlas &&
                 (itemsByContainer.get(c.id) ?? []).map((p) => {
                   const item = itemById.get(p.id);
@@ -643,15 +647,15 @@ function Tape({ text, position, height = 0.034, rotation = 0, maxWidth = 0.6 }: 
   );
 }
 
-function Furniture({ container: c, mats, open, onSelect }: { container: PlacedContainer; mats: Materials; open: boolean; onSelect: () => void }) {
+function Furniture({ container: c, mats, t, open, onSelect }: { container: PlacedContainer; mats: Materials; t: Messages; open: boolean; onSelect: () => void }) {
   const click = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     onSelect();
   };
   const label = c.name.toUpperCase();
   if (c.kind === "box") return <Box c={c} mats={mats} label={label} onClick={click} />;
-  if (c.kind === "table") return <Table c={c} mats={mats} onClick={click} />;
-  return <Shelving c={c} mats={mats} label={label} open={open} onClick={click} />;
+  if (c.kind === "table") return <Table c={c} mats={mats} label={t.scene.unplacedTape} onClick={click} />;
+  return <Shelving c={c} mats={mats} label={label} shelfTape={t.scene.shelfTape} open={open} onClick={click} />;
 }
 
 /** Los muebles se pueden tocar (llevan la cámara hasta ellos): la manito lo avisa. */
@@ -674,7 +678,7 @@ function Board({ size, position, material }: { size: [number, number, number]; p
 }
 
 /** Estantería abierta o mueble con puertas: mismos estantes, distinto frente. */
-function Shelving({ c, mats, label, open, onClick }: { c: PlacedContainer; mats: Materials; label: string; open: boolean; onClick: (e: ThreeEvent<MouseEvent>) => void }) {
+function Shelving({ c, mats, label, shelfTape, open, onClick }: { c: PlacedContainer; mats: Materials; label: string; shelfTape: (n: number) => string; open: boolean; onClick: (e: ThreeEvent<MouseEvent>) => void }) {
   const { x, width: w, height: h, depth: d, board } = c;
   const cx = x + w / 2;
   const cabinet = c.kind === "cabinet";
@@ -697,7 +701,7 @@ function Shelving({ c, mats, label, open, onClick }: { c: PlacedContainer; mats:
         <group key={i}>
           <Board size={[w - 2 * board, board, d]} position={[cx, floor - board / 2, 0]} material={mats.wood} />
           {!cabinet && c.levelFloors.length > 1 && (
-            <Tape text={`ESTANTE ${i + 1}`} position={[x + w - board - 0.07, floor - board / 2, d / 2 + 0.002]} height={0.026} rotation={0.015} maxWidth={0.12} />
+            <Tape text={shelfTape(i + 1)} position={[x + w - board - 0.07, floor - board / 2, d / 2 + 0.002]} height={0.026} rotation={0.015} maxWidth={0.12} />
           )}
         </group>
       ))}
@@ -785,7 +789,7 @@ function Box({ c, mats, label, onClick }: { c: PlacedContainer; mats: Materials;
   );
 }
 
-function Table({ c, mats, onClick }: { c: PlacedContainer; mats: Materials; onClick: (e: ThreeEvent<MouseEvent>) => void }) {
+function Table({ c, mats, label, onClick }: { c: PlacedContainer; mats: Materials; label: string; onClick: (e: ThreeEvent<MouseEvent>) => void }) {
   const { x, width: w, height: h, depth: d, board } = c;
   const cx = x + w / 2;
   const leg = 0.035;
@@ -800,7 +804,7 @@ function Table({ c, mats, onClick }: { c: PlacedContainer; mats: Materials; onCl
       ].map(([lx, lz], i) => (
         <Board key={i} size={[leg, h - board, leg]} position={[lx, (h - board) / 2, lz]} material={mats.woodDark} />
       ))}
-      <Tape text="SIN UBICAR" position={[x + 0.14, h - board / 2, d / 2 + 0.002]} height={0.028} maxWidth={0.26} />
+      <Tape text={label} position={[x + 0.14, h - board / 2, d / 2 + 0.002]} height={0.028} maxWidth={0.26} />
     </group>
   );
 }

@@ -13,10 +13,11 @@ import { searchCatalogAction } from "@/lib/actions/catalogs";
 import { movieDetailsAction, searchTmdbAction, tvSeasonsAction } from "@/lib/actions/tmdb";
 import type { CatalogResult } from "@/lib/catalogs";
 import { inventoryLabel } from "@/lib/containers";
-import { ITEM_TYPE_KEYS, ITEM_TYPES, typeDef, type ItemType } from "@/lib/item-types";
+import { ITEM_TYPE_KEYS, typeDef, type ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import type { TmdbResult, TmdbSeason } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/client";
 import { Cover } from "./Cover";
 
 interface Props {
@@ -56,6 +57,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
   const [pending, startTransition] = useTransition();
 
   const def = typeDef(type);
+  const { t } = useI18n();
 
   function setAttr(key: string, value: string) {
     setAttrs((a) => ({ ...a, [key]: value }));
@@ -96,13 +98,13 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
       if (item) {
         const res = await updateItem(item.id, input);
         if (!res.ok) return void toast.error(res.error);
-        toast.success("Cambios guardados");
+        toast.success(t.toast.saved);
         return onDone();
       }
       const res = await createItem(input);
       if (!res.ok) return void toast.error(res.error);
       // El número es para escribirlo en el lomo real, como en el de la pantalla.
-      toast.success(`"${name.trim()}" es el ${inventoryLabel(res.data.inventoryNumber)}`);
+      toast.success(t.toast.created(name.trim(), inventoryLabel(res.data.inventoryNumber, t)));
       if (again) resetForNext();
       else onDone();
     });
@@ -148,30 +150,30 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
 
       <div className="grid gap-5 sm:grid-cols-[9.5rem_1fr]">
         <div className="mx-auto w-32 sm:mx-0 sm:w-auto">
-          <Cover type={type} name={name || def.label} coverSource={cover?.source} coverRef={cover?.ref} />
+          <Cover type={type} name={name || t.types[type as ItemType].label} coverSource={cover?.source} coverRef={cover?.ref} />
           {cover && (
             <button
               type="button"
               onClick={() => setCover(null)}
               className="mt-1.5 w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
-              Quitar tapa
+              {t.form.removeCover}
             </button>
           )}
         </div>
 
         <div className="grid content-start gap-3.5">
           <div className={cn("grid gap-3", currentShelf && currentShelf.levels > 1 ? "grid-cols-3" : "grid-cols-2")}>
-            <Field label="Tipo" htmlFor="f-type">
+            <Field label={t.form.type} htmlFor="f-type">
               <NativeSelect id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
                 {ITEM_TYPE_KEYS.map((k) => (
                   <option key={k} value={k}>
-                    {ITEM_TYPES[k].label}
+                    {t.types[k].label}
                   </option>
                 ))}
               </NativeSelect>
             </Field>
-            <Field label="Dónde está" htmlFor="f-shelf">
+            <Field label={t.form.where} htmlFor="f-shelf">
               <NativeSelect
                 id="f-shelf"
                 value={shelfId ?? ""}
@@ -180,7 +182,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
                   setLevel(0);
                 }}
               >
-                <option value="">Sin ubicar</option>
+                <option value="">{t.where.unplaced}</option>
                 {shelves.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -189,11 +191,11 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
               </NativeSelect>
             </Field>
             {currentShelf && currentShelf.levels > 1 && (
-              <Field label="Estante" htmlFor="f-level">
+              <Field label={t.form.level} htmlFor="f-level">
                 <NativeSelect id="f-level" value={String(level)} onChange={(e) => setLevel(Number(e.target.value))}>
                   {Array.from({ length: currentShelf.levels }, (_, i) => (
                     <option key={i} value={i}>
-                      {i === 0 ? "1 (arriba)" : i === currentShelf.levels - 1 ? `${i + 1} (abajo)` : String(i + 1)}
+                      {i === 0 ? t.form.levelTop(1) : i === currentShelf.levels - 1 ? t.form.levelBottom(i + 1) : String(i + 1)}
                     </option>
                   ))}
                 </NativeSelect>
@@ -201,7 +203,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
             )}
           </div>
 
-          <Field label="Nombre" htmlFor="f-name">
+          <Field label={t.form.name} htmlFor="f-name">
             <Input id="f-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required />
           </Field>
 
@@ -209,22 +211,22 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {def.brandModel && (
                 <>
-                  <Field label="Marca" htmlFor="f-brand">
+                  <Field label={t.panel.brand} htmlFor="f-brand">
                     <Input id="f-brand" value={brand} onChange={(e) => setBrand(e.target.value)} maxLength={120} />
                   </Field>
-                  <Field label="Modelo" htmlFor="f-model">
+                  <Field label={t.panel.model} htmlFor="f-model">
                     <Input id="f-model" value={model} onChange={(e) => setModel(e.target.value)} maxLength={120} />
                   </Field>
                 </>
               )}
               {def.fields.map((f) => (
-                <Field key={f.key} label={f.label} htmlFor={`f-${f.key}`}>
+                <Field key={f.key} label={t.fields[f.key]} htmlFor={`f-${f.key}`}>
                   {f.kind === "select" ? (
                     <NativeSelect id={`f-${f.key}`} value={attrs[f.key] ?? ""} onChange={(e) => setAttr(f.key, e.target.value)}>
                       <option value="">—</option>
                       {f.options?.map((o) => (
                         <option key={o} value={o}>
-                          {o}
+                          {t.options[o] ?? o}
                         </option>
                       ))}
                     </NativeSelect>
@@ -235,7 +237,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
                       onChange={(e) => setAttr(f.key, e.target.value)}
                       inputMode={f.kind === "number" ? "numeric" : undefined}
                       pattern={f.kind === "number" ? "\\d*" : undefined}
-                      placeholder={f.placeholder}
+                      placeholder={f.placeholder ? (t.placeholders[f.placeholder as keyof typeof t.placeholders] ?? f.placeholder) : undefined}
                       maxLength={200}
                     />
                   )}
@@ -244,7 +246,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
             </div>
           )}
 
-          <Field label="Descripción" htmlFor="f-desc">
+          <Field label={t.form.description} htmlFor="f-desc">
             <Textarea id="f-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={2000} />
           </Field>
         </div>
@@ -252,16 +254,16 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
-          Cancelar
+          {t.common.cancel}
         </Button>
         {!editing && (
           <Button type="submit" name="intent" value="again" variant="outline" disabled={pending || !name.trim()}>
-            Agregar y cargar otro
+            {t.form.addAnother}
           </Button>
         )}
         <Button type="submit" name="intent" value="done" disabled={pending || !name.trim()} className="sm:min-w-28">
           {pending && <Loader2 className="animate-spin" />}
-          {editing ? "Guardar" : "Agregar"}
+          {editing ? t.common.save : t.form.add}
         </Button>
       </div>
     </form>
@@ -309,11 +311,12 @@ function TmdbPicker({
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [showGenre, setShowGenre] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
+  const { t } = useI18n();
 
   if (!enabled) {
     return (
       <p className="rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
-        La búsqueda en TMDB no está configurada: cargalo a mano y se va a ver con la tapa genérica.
+        {t.form.tmdbOff}
       </p>
     );
   }
@@ -387,21 +390,21 @@ function TmdbPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && search(e)}
-            placeholder={kind === "movie" ? "Buscá la película en TMDB" : "Buscá la serie en TMDB"}
+            placeholder={kind === "movie" ? t.form.tmdbMovie : t.form.tmdbTv}
             className="pl-8"
-            aria-label="Buscar en TMDB"
+            aria-label={t.form.tmdbAria}
           />
         </div>
         <Button type="button" variant="secondary" onClick={search} disabled={searching || !query.trim()}>
-          {searching ? <Loader2 className="animate-spin" /> : "Buscar"}
+          {searching ? <Loader2 className="animate-spin" /> : t.common.search}
         </Button>
       </div>
 
       {results && (
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{results.length ? "Elegí el que es:" : "No encontré nada con ese nombre."}</span>
-            <button type="button" onClick={() => setResults(null)} aria-label="Cerrar resultados" className="hover:text-foreground">
+            <span>{results.length ? t.form.pick : t.form.nothingFound}</span>
+            <button type="button" onClick={() => setResults(null)} aria-label={t.form.closeResults} className="hover:text-foreground">
               <X className="size-4" />
             </button>
           </div>
@@ -430,7 +433,7 @@ function TmdbPicker({
 
       {kind === "tv" && show && seasons && (
         <div>
-          <p className="mb-1.5 text-xs text-muted-foreground">¿Qué temporada de {show.title} tenés?</p>
+          <p className="mb-1.5 text-xs text-muted-foreground">{t.form.whichSeason(show.title)}</p>
           <ul className="flex gap-2 overflow-x-auto pb-1">
             {seasons.map((s) => (
               <li key={s.seasonNumber} className="w-20 shrink-0">
@@ -443,7 +446,7 @@ function TmdbPicker({
                   )}
                 >
                   <Cover type="series" name={s.name} coverSource="tmdb" coverRef={s.posterPath ?? show.posterPath} size="sm" />
-                  <p className="mt-1 truncate text-[11px]">Temp. {s.seasonNumber}</p>
+                  <p className="mt-1 truncate text-[11px]">{t.form.seasonChip(s.seasonNumber)}</p>
                 </button>
               </li>
             ))}
@@ -472,6 +475,7 @@ function CatalogPicker({
   const [picked, setPicked] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
   const books = catalog === "books";
+  const { t } = useI18n();
 
   function search(e?: React.SyntheticEvent) {
     e?.preventDefault();
@@ -492,21 +496,21 @@ function CatalogPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && search(e)}
-            placeholder={books ? "Buscá el libro en Open Library (título, autor o ISBN)" : "Buscá el disco en MusicBrainz (álbum y artista)"}
+            placeholder={books ? t.form.booksPlaceholder : t.form.albumsPlaceholder}
             className="pl-8"
-            aria-label={books ? "Buscar en Open Library" : "Buscar en MusicBrainz"}
+            aria-label={books ? t.form.booksAria : t.form.albumsAria}
           />
         </div>
         <Button type="button" variant="secondary" onClick={search} disabled={searching || !query.trim()}>
-          {searching ? <Loader2 className="animate-spin" /> : "Buscar"}
+          {searching ? <Loader2 className="animate-spin" /> : t.common.search}
         </Button>
       </div>
 
       {results && (
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{results.length ? "Elegí el que es:" : "No encontré nada con ese nombre."}</span>
-            <button type="button" onClick={() => setResults(null)} aria-label="Cerrar resultados" className="hover:text-foreground">
+            <span>{results.length ? t.form.pick : t.form.nothingFound}</span>
+            <button type="button" onClick={() => setResults(null)} aria-label={t.form.closeResults} className="hover:text-foreground">
               <X className="size-4" />
             </button>
           </div>

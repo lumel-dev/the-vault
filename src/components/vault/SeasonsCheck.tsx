@@ -5,6 +5,7 @@ import { tvSeasonsAction } from "@/lib/actions/tmdb";
 import type { TmdbSeason } from "@/lib/tmdb";
 import { missingSeasons } from "@/lib/seasons";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/client";
 
 /** Lo que TMDB dice de cada serie, una vez por sesión: las temporadas no cambian minuto a minuto. */
 const cache = new Map<number, Promise<TmdbSeason[] | null>>();
@@ -24,6 +25,7 @@ function seasonsOf(tvId: number): Promise<TmdbSeason[] | null> {
  */
 export function SeasonsCheck({ tvId, owned }: { tvId: number; owned: Set<number> }) {
   const [state, setState] = useState<{ id: number; seasons: TmdbSeason[] | null } | null>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     let alive = true;
@@ -33,8 +35,8 @@ export function SeasonsCheck({ tvId, owned }: { tvId: number; owned: Set<number>
     };
   }, [tvId]);
 
-  if (!state || state.id !== tvId) return <p className="mt-4 text-xs text-muted-foreground">Consultando las temporadas en TMDB…</p>;
-  if (!state.seasons) return <p className="mt-4 text-xs text-muted-foreground">No se pudieron consultar las temporadas en TMDB.</p>;
+  if (!state || state.id !== tvId) return <p className="mt-4 text-xs text-muted-foreground">{t.panel.seasonsLoading}</p>;
+  if (!state.seasons) return <p className="mt-4 text-xs text-muted-foreground">{t.panel.seasonsError}</p>;
 
   const { aired, missing } = missingSeasons(state.seasons, owned);
   if (!aired.length) return null;
@@ -43,26 +45,26 @@ export function SeasonsCheck({ tvId, owned }: { tvId: number; owned: Set<number>
     <div className="mt-4">
       <p className="text-sm font-semibold">
         {missing.length === 0
-          ? "Tenés la serie completa"
+          ? t.panel.seasonsComplete
           : missing.length === 1
-            ? `Te falta la temporada ${missing[0]}`
-            : `Te faltan ${missing.length} de ${aired.length} temporadas`}
+            ? t.panel.seasonsMissingOne(missing[0])
+            : t.panel.seasonsMissing(missing.length, aired.length)}
       </p>
-      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Temporadas">
+      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={t.panel.seasons}>
         {aired.map((s) => {
           const has = owned.has(s.seasonNumber);
           return (
             <li
               key={s.seasonNumber}
-              title={`${s.name}${s.year ? ` (${s.year})` : ""}${has ? "" : " · te falta"}`}
+              title={`${s.name}${s.year ? ` (${s.year})` : ""}${has ? "" : t.panel.seasonMissingTitle}`}
               className={cn(
                 "grid h-7 min-w-9 place-items-center rounded px-1.5 text-xs font-semibold tabular-nums",
                 has ? "bg-marker text-white" : "border-2 border-dashed border-marker-red text-marker-red",
               )}
             >
               <span>
-                T{s.seasonNumber}
-                <span className="sr-only">{has ? ", la tenés" : ", te falta"}</span>
+                {t.seasonShort(s.seasonNumber)}
+                <span className="sr-only">{has ? t.panel.seasonHave : t.panel.seasonMissing}</span>
               </span>
             </li>
           );

@@ -237,7 +237,7 @@ const en: Messages = {
     signupClosed: "Sign-up is closed",
     emailTaken: "There's already an account with that email",
     badEmail: "Invalid email",
-    shortPassword: "The password needs at least 10 characters",
+    shortPassword: (n: number) => `The password needs at least ${n} characters`,
     tmdb: "Couldn't reach TMDB",
     openlibrary: "Couldn't reach Open Library",
     musicbrainz: "Couldn't reach MusicBrainz",

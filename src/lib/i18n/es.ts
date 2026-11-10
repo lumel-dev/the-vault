@@ -243,7 +243,7 @@ const es = {
     signupClosed: "El registro está cerrado",
     emailTaken: "Ya hay una cuenta con ese email",
     badEmail: "Email inválido",
-    shortPassword: "La contraseña tiene que tener al menos 10 caracteres",
+    shortPassword: (n: number) => `La contraseña tiene que tener al menos ${n} caracteres`,
     tmdb: "No se pudo consultar TMDB",
     openlibrary: "No se pudo consultar Open Library",
     musicbrainz: "No se pudo consultar MusicBrainz",

@@ -36,6 +36,15 @@ mock.module("@/lib/auth/auth", {
 });
 mock.module("next/cache", { namedExports: { revalidatePath: () => {}, revalidateTag: () => {} } });
 mock.module("server-only", { namedExports: {} });
+// Fuera de una request no hay headers: el idioma del navegador se simula con esta variable.
+mock.module("next/headers", {
+  namedExports: {
+    headers: async () => new Headers({ "accept-language": process.env.TEST_ACCEPT_LANGUAGE ?? "es-AR" }),
+    // next-auth lo importa; la sesión ya está simulada, así que no se usa.
+    cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
+    draftMode: async () => ({ isEnabled: false }),
+  },
+});
 
 export const { db } = await import("@/lib/db");
 const schema = await import("@/lib/db/schema");

@@ -150,6 +150,26 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  /* Tailwind v4 deja los botones con el cursor por defecto: todo lo que se puede tocar lleva la
+   * manito, y lo deshabilitado lo dice. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  a[href],
+  summary,
+  select:not(:disabled),
+  label:has(> input[type="radio"], > input[type="checkbox"]),
+  input[type="radio"],
+  input[type="checkbox"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   ::selection {
     background: var(--tape);
     color: var(--marker);

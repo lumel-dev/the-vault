@@ -16,6 +16,8 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   passwordSalt: text("password_salt").notNull(),
+  // El idioma de la app para este usuario ("es" o "en"). Ver `src/lib/i18n`.
+  locale: text("locale").notNull().default("es"),
   // El último número de inventario entregado. Ver `items.inventoryNumber`.
   inventorySeq: integer("inventory_seq").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -44,6 +46,19 @@ export const shelves = pgTable(
 /** Los datos propios de cada tipo (temporada, formato, autor…). Ver `src/lib/item-types.ts`. */
 export type ItemAttributes = Record<string, string>;
 
+/**
+ * Lo que cambia según el idioma, tal como lo devolvió el catálogo (hoy, TMDB) en cada uno: título,
+ * sinopsis, género y tapa (TMDB tiene un póster por idioma). Lo que falta en un idioma se toma de
+ * las columnas comunes. Ver `src/lib/localized.ts`.
+ */
+export interface ItemTranslation {
+  name?: string;
+  description?: string | null;
+  genre?: string | null;
+  coverRef?: string | null;
+}
+export type ItemTranslations = Partial<Record<"es" | "en", ItemTranslation>>;
+
 export const items = pgTable(
   "items",
   {
@@ -59,6 +74,7 @@ export const items = pgTable(
     brand: text("brand"),
     model: text("model"),
     attributes: jsonb("attributes").$type<ItemAttributes>().notNull().default({}),
+    translations: jsonb("translations").$type<ItemTranslations>().notNull().default({}),
     // La tapa nunca se guarda: se guarda de dónde pedirla (ej. "tmdb" + "/abc.jpg").
     coverSource: text("cover_source"),
     coverRef: text("cover_ref"),

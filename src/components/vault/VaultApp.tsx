@@ -16,7 +16,7 @@ import {
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Plus, Search, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -24,7 +24,12 @@ import { deleteItem, moveItem, placeItem, reorderItems } from "@/lib/actions/ite
 import { isItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import { search } from "@/lib/search";
-import { isSortKey, SORT_KEYS, SORTS, sortItems, type SortKey } from "@/lib/sort";
+import { isSortKey, SORT_KEYS, sortItems, type SortKey } from "@/lib/sort";
+import { completeTranslations } from "@/lib/actions/items";
+import { setLocaleAction } from "@/lib/actions/auth";
+import { LOCALES, type Locale, type Messages } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n/client";
+import { localize } from "@/lib/localized";
 import { cn } from "@/lib/utils";
 import { whereabouts, whereLabel } from "@/lib/where";
 import { ContainerDialog, type ContainerDialogMode } from "./ContainerDialog";
@@ -37,11 +42,7 @@ import { Sticker } from "./Sticker";
 // El 3D se baja aparte y sólo en el browser: la búsqueda y la grilla no lo esperan.
 const VaultScene = dynamic(() => import("@/components/vault3d/VaultScene"), {
   ssr: false,
-  loading: () => (
-    <div className="grid size-full place-items-center text-sm text-muted-foreground">
-      <span className="tape -rotate-2 px-3 py-1 text-base">Armando los muebles…</span>
-    </div>
-  ),
+  loading: () => <SceneLoading />,
 });
 
 export type View = "mueble" | "grilla";
@@ -110,6 +111,23 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     setPrevServer(serverItems);
     setItems(serverItems);
   }
+  const { locale, t } = useI18n();
+
+  // Lo cargado desde TMDB antes de que la app fuera bilingüe se completa solo, de a tandas, en
+  // segundo plano: cada tanda guarda los dos idiomas y el server manda la colección actualizada.
+  const completing = useRef(false);
+  const needsTranslations = serverItems.some((i) => i.externalSource === "tmdb" && Object.keys(i.translations ?? {}).length === 0);
+  useEffect(() => {
+    if (!needsTranslations || !tmdbEnabled || completing.current) return;
+    completing.current = true;
+    void (async () => {
+      for (let round = 0; round < 50; round++) {
+        const res = await completeTranslations();
+        if (!res.ok || res.data.remaining === 0 || res.data.done === 0) break;
+      }
+      completing.current = false;
+    })();
+  }, [needsTranslations, tmdbEnabled]);
 
   const narrow = useSyncExternalStore(subscribeNarrow, () => window.matchMedia("(max-width: 767px)").matches, () => false);
   const storedView = useSyncExternalStore(subscribeView, readView, () => "grilla" as View);
@@ -144,8 +162,9 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     return () => pending.forEach((t) => window.clearTimeout(t));
   }, []);
 
-  // Lo que se está por borrar sigue a la vista (tachado) hasta que vence el deshacer.
-  const visibleItems = items;
+  // Lo que se ve, en el idioma elegido (título, sinopsis, género y tapa). \`items\` queda con los
+  // datos tal cual para mover y guardar. Lo que se está por borrar sigue a la vista, tachado.
+  const visibleItems = useMemo(() => items.map((i) => localize(i, locale)), [items, locale]);
 
   /** Lo que coincide con la búsqueda y el filtro de tipo; `null` cuando no hay ninguno. */
   const matches = useMemo(() => {
@@ -173,7 +192,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     [visibleItems, matches, focus, sort],
   );
 
-  const selected = selectedId ? items.find((i) => i.id === selectedId) ?? null : null;
+  const selected = selectedId ? visibleItems.find((i) => i.id === selectedId) ?? null : null;
   const total = items.length;
 
   function pickView(next: View) {
@@ -208,8 +227,9 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
       toast.error(res.error);
       return;
     }
-    const levelText = shelf && shelf.levels > 1 ? ` · estante ${level + 1}` : "";
-    toast.success(`${moving.name} → ${shelf?.name ?? "Sin ubicar"}${levelText}`);
+    const levelText = shelf && shelf.levels > 1 ? ` · ${t.toast.level(level + 1)}` : "";
+    const shownName = visibleItems.find((i) => i.id === itemId)?.name ?? moving.name;
+    toast.success(t.toast.moved(shownName, `${shelf?.name ?? t.where.unplaced}${levelText}`));
   }
 
   /** Sacar de la bóveda: se tacha con fibrón y queda 5 segundos para deshacer. */
@@ -225,7 +245,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
         return n;
       });
     };
-    toast(`${item.name} sale de la bóveda`, { action: { label: "Deshacer", onClick: undo }, duration: 5000 });
+    toast(t.toast.leaving(item.name), { action: { label: t.toast.undo, onClick: undo }, duration: 5000 });
     const timer = window.setTimeout(async () => {
       timers.current.delete(item.id);
       const res = await deleteItem(item.id);
@@ -245,19 +265,20 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
    * el orden guardado (cada estante queda ordenado; nada cambia de estante).
    */
   async function arrange(containerId: string | null) {
-    const inside = items.filter((i) => i.shelfId === containerId);
+    const inside = visibleItems.filter((i) => i.shelfId === containerId);
     if (inside.length < 2 || sort === "manual") return;
     const sorted = sortItems(inside, sort);
     const before = items;
     const ids = new Set(sorted.map((i) => i.id));
-    const queue = [...sorted];
+    const rawById = new Map(items.map((i) => [i.id, i]));
+    const queue = sorted.map((i) => rawById.get(i.id)!);
     setItems(items.map((i) => (ids.has(i.id) ? queue.shift()! : i)));
     const res = await reorderItems(sorted.map((i) => i.id));
-    const name = containerId ? shelves.find((s) => s.id === containerId)?.name : "Sin ubicar";
+    const name = containerId ? shelves.find((s) => s.id === containerId)?.name : t.where.unplaced;
     if (!res.ok) {
       setItems(before);
       toast.error(res.error);
-    } else toast.success(`${name} quedó ordenado por ${SORTS[sort].toLowerCase()}`);
+    } else toast.success(t.toast.arranged(name ?? "", t.sort[sort].toLowerCase()));
   }
 
   /* ---------------------------------------------------------- grilla: dnd-kit */
@@ -286,7 +307,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
       if (!res.ok) {
         setItems(before);
         toast.error(res.error);
-      } else toast.success(`${item.name} → ${shelves.find((s) => s.id === target)?.name ?? "Sin ubicar"}`);
+      } else toast.success(t.toast.moved(visibleItems.find((i) => i.id === id)?.name ?? item.name, shelves.find((s) => s.id === target)?.name ?? t.where.unplaced));
       return;
     }
     if (id === overId) return;
@@ -296,7 +317,8 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     const reordered = arrayMove(gridItems, from, to);
     // Lo que no se ve en la grilla filtrada conserva su lugar en la colección.
     const visible = new Set(reordered.map((i) => i.id));
-    const queue = [...reordered];
+    const rawById = new Map(items.map((i) => [i.id, i]));
+    const queue = reordered.map((i) => rawById.get(i.id)!);
     setItems(items.map((i) => (visible.has(i.id) ? queue.shift()! : i)));
     const res = await reorderItems(reordered.map((i) => i.id));
     if (!res.ok) {
@@ -307,7 +329,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
 
   const gridDragItem = gridDragId ? items.find((i) => i.id === gridDragId) ?? null : null;
   const createShelfId = focus !== "all" && focus !== "none" ? focus : null;
-  const matchList = matches && view === "mueble" ? items.filter((i) => matches.has(i.id)) : [];
+  const matchList = matches && view === "mueble" ? visibleItems.filter((i) => matches.has(i.id)) : [];
 
   return (
     <DndContext
@@ -318,7 +340,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
       onDragEnd={onGridDragEnd}
       onDragCancel={() => setGridDragId(null)}
       accessibility={{
-        screenReaderInstructions: { draggable: "Para levantar un objeto, apretá espacio. Movelo con las flechas y soltalo con espacio. Escape cancela." },
+        screenReaderInstructions: { draggable: t.grid.dragInstructions },
       }}
     >
       <div className="flex min-h-dvh flex-col md:h-dvh md:min-h-0">
@@ -369,7 +391,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
                   onPlace={place}
                 />
                 {matchList.length > 0 && !selected && (
-                  <MatchStrip items={matchList} all={items} shelves={shelves} selectedId={selectedId} onPick={setSelectedId} />
+                  <MatchStrip items={matchList} all={visibleItems} shelves={shelves} selectedId={selectedId} onPick={setSelectedId} />
                 )}
                 {matches && matchList.length === 0 && <NoMatch q={q} onClear={() => (setQ(""), setType("all"))} />}
                 {total === 0 && <EmptyVault onAdd={() => setItemDialog({ kind: "create", shelfId: null })} onContainer={() => setContainerDialog({ kind: "create" })} />}
@@ -377,12 +399,10 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
                   sort={sort}
                   onSort={setSort}
                   target={focus === "all" ? undefined : focus === "none" ? null : focus}
-                  targetName={focus === "none" ? "Sin ubicar" : shelves.find((s) => s.id === focus)?.name}
+                  targetName={focus === "none" ? t.where.unplaced : shelves.find((s) => s.id === focus)?.name}
                   onArrange={arrange}
                 />
-                <p className="pointer-events-none absolute bottom-3 left-4 hidden text-xs text-muted-foreground md:block">
-                  Tocá un lomo para sacarlo · arrastralo a otro estante o caja · arrastrá el fondo para mirar alrededor
-                </p>
+                <p className="pointer-events-none absolute bottom-3 left-4 hidden text-xs text-muted-foreground md:block">{t.scene.hint}</p>
               </div>
             ) : (
               <GridView
@@ -398,7 +418,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
                 q={q}
                 sort={sort}
                 onSort={setSort}
-                title={focus === "all" ? "Toda la casa" : focus === "none" ? "Sin ubicar" : shelves.find((s) => s.id === focus)?.name ?? "Contenedor"}
+                title={focus === "all" ? t.rail.wholeHouse : focus === "none" ? t.rail.unplaced : shelves.find((s) => s.id === focus)?.name ?? t.rail.containers}
               />
             )}
 
@@ -406,8 +426,8 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
               <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 md:absolute md:inset-x-auto md:top-4 md:right-4 md:bottom-auto">
                 <ItemPanel
                   item={selected}
-                  collection={items}
-                  where={whereabouts(selected, items, shelves)}
+                  collection={visibleItems}
+                  where={whereabouts(selected, items, shelves, t)}
                   onClose={() => setSelectedId(null)}
                   onEdit={() => setItemDialog({ kind: "edit", item: selected })}
                   onDelete={() => requestDelete(selected)}
@@ -461,6 +481,7 @@ function TopBar({
   logout: React.ReactNode;
   matchCount: number | null;
 }) {
+  const { t } = useI18n();
   return (
     <header className="sticky top-0 z-20 border-b-[3px] border-kraft-dark bg-kraft">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 md:h-16 md:flex-nowrap md:px-5 md:py-0">
@@ -472,7 +493,7 @@ function TopBar({
         </h1>
 
         <label className="relative order-3 w-full md:order-2 md:w-auto md:flex-1">
-          <span className="sr-only">Buscar en la colección</span>
+          <span className="sr-only">{t.top.searchLabel}</span>
           <Search className="pointer-events-none absolute top-1/2 left-3 size-[1.125rem] -translate-y-1/2 text-marker/70" />
           <input
             type="search"
@@ -480,24 +501,24 @@ function TopBar({
             autoComplete="off"
             value={q}
             onChange={(e) => onQuery(e.target.value)}
-            placeholder={narrow ? "¿Lo tengo?" : "¿Lo tengo? Buscá un título, una temporada, un director…"}
+            placeholder={narrow ? t.top.searchPlaceholderShort : t.top.searchPlaceholder}
             className="h-11 w-full rounded-md border-2 border-marker bg-card pr-24 pl-10 text-base outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-marker/30 [&::-webkit-search-cancel-button]:hidden"
           />
           <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
             {matchCount !== null && (
               <span className={cn("rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums", matchCount ? "bg-marker-red text-white" : "bg-muted text-muted-foreground")} aria-live="polite">
-                {matchCount === 0 ? "No lo tenés" : matchCount === 1 ? "1 lo tenés" : `${matchCount} coinciden`}
+                {matchCount === 0 ? t.top.noMatch : matchCount === 1 ? t.top.oneMatch : t.top.matches(matchCount)}
               </span>
             )}
             {q && (
-              <button type="button" onClick={() => onQuery("")} aria-label="Borrar búsqueda" className="grid size-7 place-items-center rounded text-marker/60 hover:text-marker">
+              <button type="button" onClick={() => onQuery("")} aria-label={t.top.clearSearch} className="grid size-7 place-items-center rounded text-marker/60 hover:text-marker">
                 <X className="size-4" />
               </button>
             )}
           </span>
         </label>
 
-        <div role="tablist" aria-label="Vista" className="order-4 flex h-11 md:order-3 overflow-hidden rounded-md border-2 border-marker text-sm font-semibold">
+        <div role="tablist" aria-label={t.top.view} className="order-4 flex h-11 md:order-3 overflow-hidden rounded-md border-2 border-marker text-sm font-semibold">
           {(["mueble", "grilla"] as const).map((v) => (
             <button
               key={v}
@@ -507,19 +528,20 @@ function TopBar({
               onClick={() => onView(v)}
               className={cn("px-3.5 transition-colors", view === v ? "bg-marker text-white" : "bg-card/50 text-marker hover:bg-card")}
             >
-              {v === "mueble" ? "Mueble" : "Grilla"}
+              {v === "mueble" ? t.top.viewShelves : t.top.viewGrid}
             </button>
           ))}
         </div>
 
         <Button onClick={onAdd} className="order-5 h-11 rounded-md px-4 text-sm md:order-4">
           <Plus />
-          Agregar
+          {t.top.add}
         </Button>
 
         {/* Una sola vez: en el celular sube al lado del logo con order, en desktop queda al final. */}
         <div className="order-2 ml-auto flex items-center gap-2 md:order-6 md:ml-0">
           <span className="hidden text-sm text-marker/80 md:inline">{userName}</span>
+          <LocaleSwitch />
           {logout}
         </div>
       </div>
@@ -535,6 +557,7 @@ function LogoTape() {
 
 /** Las coincidencias en texto, al instante, aunque el 3D todavía se esté armando. */
 function MatchStrip({ items, all, shelves, selectedId, onPick }: { items: VaultItem[]; all: VaultItem[]; shelves: VaultShelf[]; selectedId: string | null; onPick: (id: string) => void }) {
+  const { t } = useI18n();
   return (
     <div className="absolute top-3 left-3 z-10 max-h-[30%] md:max-h-[45%] w-[min(22rem,calc(100%-1.5rem))] overflow-y-auto rounded-lg bg-card/95 p-1.5 shadow-[0_10px_30px_-12px_rgb(28_27_25/55%)] backdrop-blur-sm">
       <ul>
@@ -549,9 +572,9 @@ function MatchStrip({ items, all, shelves, selectedId, onPick }: { items: VaultI
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">
                   {i.name}
-                  {i.type === "series" && i.attributes.season ? ` · T${i.attributes.season}` : ""}
+                  {i.type === "series" && i.attributes.season ? ` · ${t.seasonShort(i.attributes.season)}` : ""}
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">{whereLabel(whereabouts(i, all, shelves))}</span>
+                <span className="block truncate text-xs text-muted-foreground">{whereLabel(whereabouts(i, all, shelves, t))}</span>
               </span>
             </button>
           </li>
@@ -562,28 +585,30 @@ function MatchStrip({ items, all, shelves, selectedId, onPick }: { items: VaultI
 }
 
 function NoMatch({ q, onClear }: { q: string; onClear: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="absolute top-3 left-3 z-10 rounded-lg bg-card p-4 shadow-[0_10px_30px_-12px_rgb(28_27_25/55%)]">
-      <p className="font-semibold">{q ? `No tenés nada que se llame "${q}"` : "No hay nada de este tipo"}</p>
+      <p className="font-semibold">{q ? t.scene.noMatch(q) : t.scene.noMatchType}</p>
       <button type="button" onClick={onClear} className="mt-1 text-sm underline underline-offset-4">
-        Ver todo
+        {t.common.seeAll}
       </button>
     </div>
   );
 }
 
 function EmptyVault({ onAdd, onContainer }: { onAdd: () => void; onContainer: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="absolute inset-x-4 top-6 z-10 mx-auto max-w-md rounded-lg bg-card p-6 text-center shadow-[0_14px_40px_-16px_rgb(28_27_25/55%)]">
-      <p className="text-lg font-bold">La casa está vacía</p>
-      <p className="mt-1 text-sm text-muted-foreground">Primero contale qué muebles y cajas tenés; después cargá lo que hay en cada uno.</p>
+      <p className="text-lg font-bold">{t.scene.emptyTitle}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{t.scene.emptyBody}</p>
       <div className="mt-4 flex justify-center gap-2">
         <Button variant="outline" onClick={onContainer}>
-          Nuevo contenedor
+          {t.rail.newContainer}
         </Button>
         <Button onClick={onAdd}>
           <Plus />
-          Agregar algo
+          {t.scene.addSomething}
         </Button>
       </div>
     </div>
@@ -622,34 +647,35 @@ function GridView({
   title: string;
 }) {
   const manual = sort === "manual";
+  const { t } = useI18n();
   return (
     <section aria-label={title} className="px-4 pt-4 pb-40 md:h-full md:overflow-y-auto md:px-6 md:pt-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-xl font-bold tracking-tight">
-          {title} <span className="ml-1 text-sm font-normal text-muted-foreground tabular-nums">{items.length === 1 ? "1 objeto" : `${items.length} objetos`}</span>
+          {title} <span className="ml-1 text-sm font-normal text-muted-foreground tabular-nums">{t.grid.objects(items.length)}</span>
         </h2>
         <SortSelect sort={sort} onSort={onSort} />
       </div>
       {items.length === 0 ? (
         total === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-marker/25 px-6 py-16 text-center">
-            <p className="text-lg font-bold">La casa está vacía</p>
-            <p className="mt-1 text-sm text-muted-foreground">Contale qué muebles y cajas tenés, y cargá lo que hay en cada uno.</p>
+            <p className="text-lg font-bold">{t.grid.emptyTitle}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.grid.emptyBody}</p>
             <div className="mt-4 flex justify-center gap-2">
               <Button variant="outline" onClick={onContainer}>
-                Nuevo contenedor
+                {t.rail.newContainer}
               </Button>
               <Button onClick={onAdd}>
                 <Plus />
-                Agregar algo
+                {t.scene.addSomething}
               </Button>
             </div>
           </div>
         ) : (
           <div className="rounded-lg border-2 border-dashed border-marker/25 px-6 py-14 text-center">
-            <p className="font-semibold">{filtering ? (q ? `No tenés nada que se llame "${q}"` : "No hay nada de este tipo acá") : "Acá no hay nada todavía"}</p>
+            <p className="font-semibold">{filtering ? (q ? t.scene.noMatch(q) : t.grid.nothingOfType) : t.grid.nothingHere}</p>
             <button type="button" onClick={onClear} className="mt-1 text-sm underline underline-offset-4">
-              Ver toda la casa
+              {t.grid.seeWholeHouse}
             </button>
           </div>
         )
@@ -657,15 +683,13 @@ function GridView({
         <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-4 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
             {items.map((item) => (
-              <ItemCard key={item.id} item={item} onOpen={onOpen} striking={pendingDelete.has(item.id)} selected={selectedId === item.id} sortable={manual} caption={captionFor(item, sort)} />
+              <ItemCard key={item.id} item={item} onOpen={onOpen} striking={pendingDelete.has(item.id)} selected={selectedId === item.id} sortable={manual} caption={captionFor(item, sort, t)} />
             ))}
           </ul>
         </SortableContext>
       )}
       <p className="mt-6 text-xs text-muted-foreground">
-        {manual
-          ? "Arrastrá una tapa sobre un contenedor para guardarla ahí, o entre las demás para cambiarle el orden."
-          : `Ordenado por ${SORTS[sort].toLowerCase()}. Para acomodar a mano, volvé a "${SORTS.manual}".`}
+        {manual ? t.grid.hintManual : t.grid.hintSorted(t.sort[sort].toLowerCase(), t.sort.manual)}
       </p>
     </section>
   );
@@ -673,21 +697,22 @@ function GridView({
 
 /* -------------------------------------------------------------------- orden */
 
-function captionFor(item: VaultItem, sort: SortKey): string | undefined {
-  if (sort === "genre") return item.attributes.genre || "Sin género";
-  if (sort === "year") return item.attributes.year || "Sin año";
+function captionFor(item: VaultItem, sort: SortKey, t: Messages): string | undefined {
+  if (sort === "genre") return item.attributes.genre || t.grid.noGenre;
+  if (sort === "year") return item.attributes.year || t.grid.noYear;
   return undefined;
 }
 
 function SortSelect({ sort, onSort }: { sort: SortKey; onSort: (s: SortKey) => void }) {
+  const { t } = useI18n();
   return (
     <label className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Ordenar por</span>
+      <span className="text-muted-foreground">{t.sort.label}</span>
       <span className="w-36">
         <NativeSelect value={sort} onChange={(e) => onSort(e.target.value as SortKey)} className="h-8 bg-card">
           {SORT_KEYS.map((k) => (
             <option key={k} value={k}>
-              {SORTS[k]}
+              {t.sort[k]}
             </option>
           ))}
         </NativeSelect>
@@ -713,17 +738,56 @@ function ArrangeControl({
   targetName: string | undefined;
   onArrange: (id: string | null) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="absolute right-3 bottom-3 z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg bg-card/95 p-2 shadow-[0_10px_30px_-12px_rgb(28_27_25/55%)]">
       <SortSelect sort={sort} onSort={onSort} />
       {sort !== "manual" &&
         (target === undefined ? (
-          <span className="text-xs text-muted-foreground">Elegí un contenedor para acomodarlo</span>
+          <span className="text-xs text-muted-foreground">{t.scene.pickContainer}</span>
         ) : (
           <Button size="sm" onClick={() => onArrange(target)}>
-            Acomodar {targetName} así
+            {t.scene.arrange(targetName ?? "")}
           </Button>
         ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------- idioma */
+
+function SceneLoading() {
+  const { t } = useI18n();
+  return (
+    <div className="grid size-full place-items-center text-sm text-muted-foreground">
+      <span className="tape -rotate-2 px-3 py-1 text-base">{t.scene.loading}</span>
+    </div>
+  );
+}
+
+/**
+ * ES / EN. Se guarda en la cuenta: cambia la interfaz y los títulos, sinopsis, géneros y tapas de lo
+ * que vino de TMDB, sin volver a pedir nada (los dos idiomas ya están guardados).
+ */
+function LocaleSwitch() {
+  const { locale, t } = useI18n();
+  const [pending, startTransition] = useTransition();
+  return (
+    <div role="group" aria-label={t.locale.label} className={cn("flex h-9 overflow-hidden rounded-md border-2 border-marker text-xs font-bold", pending && "opacity-60")}>
+      {LOCALES.map((l: Locale) => (
+        <button
+          key={l}
+          type="button"
+          lang={l}
+          aria-pressed={locale === l}
+          title={t.locale[l]}
+          disabled={pending}
+          onClick={() => locale !== l && startTransition(() => setLocaleAction(l))}
+          className={cn("px-2 uppercase transition-colors", locale === l ? "bg-marker text-white" : "bg-card/50 text-marker hover:bg-card")}
+        >
+          {l}
+        </button>
+      ))}
     </div>
   );
 }

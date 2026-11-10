@@ -28,7 +28,11 @@ export function sesionComo(userId: string | null) {
 }
 
 mock.module("@/lib/auth/auth", {
-  namedExports: { auth: async () => (usuarioActual ? { user: { id: usuarioActual } } : null) },
+  namedExports: {
+    auth: async () => (usuarioActual ? { user: { id: usuarioActual } } : null),
+    signIn: async () => {},
+    signOut: async () => {},
+  },
 });
 mock.module("next/cache", { namedExports: { revalidatePath: () => {}, revalidateTag: () => {} } });
 mock.module("server-only", { namedExports: {} });

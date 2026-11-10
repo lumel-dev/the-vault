@@ -9,19 +9,22 @@
  * componentes para armar el formulario.
  */
 
+import type { Messages } from "./i18n";
+
 export type FieldKind = "text" | "number" | "select";
 
 export interface AttributeField {
-  key: string;
-  label: string;
+  /** También es la clave de su etiqueta en el diccionario: `t.fields[key]`. */
+  key: keyof Messages["fields"];
   kind: FieldKind;
+  /** Los valores se guardan tal cual (en castellano); se muestran con `t.options[valor]`. */
   options?: readonly string[];
+  /** Un ejemplo literal ("1999") o la clave de uno traducido en `t.placeholders`. */
   placeholder?: string;
 }
 
+/** Las etiquetas ("Película", "Movies") están en el diccionario: `t.types[tipo]`. */
 export interface ItemTypeDef {
-  label: string;
-  plural: string;
   /** Qué búsqueda de TMDB usa para sugerir datos y tapa. */
   tmdb?: "movie" | "tv";
   /** El catálogo abierto donde se buscan los que no están en TMDB. Ver `src/lib/catalogs.ts`. */
@@ -33,62 +36,50 @@ export interface ItemTypeDef {
 
 const FORMATOS_VIDEO = ["DVD", "Blu-ray", "4K UHD", "VHS", "Digital"] as const;
 
-const formatoVideo: AttributeField = { key: "format", label: "Formato", kind: "select", options: FORMATOS_VIDEO };
-const anio: AttributeField = { key: "year", label: "Año", kind: "number", placeholder: "1999" };
-const discos: AttributeField = { key: "discs", label: "Discos", kind: "number", placeholder: "1" };
-const region: AttributeField = { key: "region", label: "Región", kind: "text", placeholder: "4" };
-const edicion: AttributeField = { key: "edition", label: "Edición", kind: "text", placeholder: "Coleccionista" };
-const genero: AttributeField = { key: "genre", label: "Género", kind: "text", placeholder: "Drama" };
+const formatoVideo: AttributeField = { key: "format", kind: "select", options: FORMATOS_VIDEO };
+const anio: AttributeField = { key: "year", kind: "number", placeholder: "1999" };
+const discos: AttributeField = { key: "discs", kind: "number", placeholder: "1" };
+const region: AttributeField = { key: "region", kind: "text", placeholder: "4" };
+const edicion: AttributeField = { key: "edition", kind: "text", placeholder: "edition" };
+const genero: AttributeField = { key: "genre", kind: "text", placeholder: "genre" };
 
 export const ITEM_TYPES = {
   movie: {
-    label: "Película",
-    plural: "Películas",
     tmdb: "movie",
     brandModel: false,
-    fields: [formatoVideo, anio, genero, { key: "director", label: "Dirección", kind: "text" }, discos, region, edicion],
+    fields: [formatoVideo, anio, genero, { key: "director", kind: "text" }, discos, region, edicion],
   },
   series: {
-    label: "Serie",
-    plural: "Series",
     tmdb: "tv",
     brandModel: false,
-    fields: [formatoVideo, { key: "season", label: "Temporada", kind: "number", placeholder: "1" }, anio, genero, discos, region, edicion],
+    fields: [formatoVideo, { key: "season", kind: "number", placeholder: "1" }, anio, genero, discos, region, edicion],
   },
   book: {
-    label: "Libro",
-    plural: "Libros",
     catalog: "books",
     brandModel: false,
     fields: [
-      { key: "author", label: "Autor", kind: "text" },
-      { key: "publisher", label: "Editorial", kind: "text" },
+      { key: "author", kind: "text" },
+      { key: "publisher", kind: "text" },
       anio,
       genero,
-      { key: "isbn", label: "ISBN", kind: "text" },
+      { key: "isbn", kind: "text" },
     ],
   },
   music: {
-    label: "Música",
-    plural: "Música",
     catalog: "albums",
     brandModel: false,
     fields: [
-      { key: "artist", label: "Artista", kind: "text" },
-      { key: "format", label: "Formato", kind: "select", options: ["CD", "Vinilo", "Casete", "Digital"] },
+      { key: "artist", kind: "text" },
+      { key: "format", kind: "select", options: ["CD", "Vinilo", "Casete", "Digital"] },
       anio,
       genero,
     ],
   },
   game: {
-    label: "Videojuego",
-    plural: "Videojuegos",
     brandModel: false,
-    fields: [{ key: "platform", label: "Plataforma", kind: "text", placeholder: "PS2" }, anio, genero],
+    fields: [{ key: "platform", kind: "text", placeholder: "PS2" }, anio, genero],
   },
   other: {
-    label: "Otro",
-    plural: "Otros",
     brandModel: true,
     fields: [],
   },
@@ -127,21 +118,22 @@ export function cleanAttributes(type: string, raw: Record<string, unknown>): Rec
 }
 
 /** La línea chica debajo del nombre en la tarjeta: "Temporada 2 · DVD", "1999 · Blu-ray". */
-export function subtitle(type: string, attributes: Record<string, string>, brand?: string | null, model?: string | null): string {
+export function subtitle(type: string, attributes: Record<string, string>, t: Messages, brand?: string | null, model?: string | null): string {
   const a = attributes;
+  const format = a.format ? (t.options[a.format] ?? a.format) : undefined;
   const parts: (string | undefined)[] = [];
   switch (type) {
     case "series":
-      parts.push(a.season ? `Temporada ${a.season}` : undefined, a.format);
+      parts.push(a.season ? t.season(a.season) : undefined, format);
       break;
     case "movie":
-      parts.push(a.year, a.format);
+      parts.push(a.year, format);
       break;
     case "book":
       parts.push(a.author, a.year);
       break;
     case "music":
-      parts.push(a.artist, a.format);
+      parts.push(a.artist, format);
       break;
     case "game":
       parts.push(a.platform, a.year);

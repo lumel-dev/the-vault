@@ -1,10 +1,17 @@
 /**
- * Cliente mínimo de TMDB (themoviedb.org): buscar películas y series, las temporadas de una serie
- * y la dirección de una película. Se usa sólo del lado del server: el token no llega al browser.
+ * Cliente mínimo de TMDB (themoviedb.org): buscar películas y series, las temporadas de una serie,
+ * la dirección de una película y los datos de un título en cada idioma de la app. Se usa sólo del
+ * lado del server: el token no llega al browser.
+ *
+ * Cada pedido va en un idioma (`es-MX` o `en-US`, ver `TMDB_LANGUAGE` en `src/lib/i18n`): la
+ * búsqueda en el del usuario, y al guardar algo se piden los dos para poder mostrarlo en cualquiera.
  *
  * Sin `TMDB_API_TOKEN` (el "API Read Access Token" de la cuenta de TMDB) la búsqueda queda
  * deshabilitada y los objetos se cargan a mano, con la tapa genérica.
  */
+
+import type { ItemTranslations } from "@/lib/db/schema";
+import { LOCALES, TMDB_LANGUAGE, type Locale } from "@/lib/i18n";
 
 const BASE = "https://api.themoviedb.org/3";
 
@@ -12,15 +19,11 @@ export function tmdbEnabled(): boolean {
   return Boolean(process.env.TMDB_API_TOKEN);
 }
 
-function language(): string {
-  return process.env.TMDB_LANGUAGE || "es-MX";
-}
-
-async function tmdbGet<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+async function tmdbGet<T>(path: string, locale: Locale, params: Record<string, string> = {}): Promise<T> {
   const token = process.env.TMDB_API_TOKEN;
   if (!token) throw new Error("TMDB no está configurado (falta TMDB_API_TOKEN).");
   const url = new URL(BASE + path);
-  url.searchParams.set("language", language());
+  url.searchParams.set("language", TMDB_LANGUAGE[locale]);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -71,10 +74,10 @@ export function mapSearchItem(kind: "movie" | "tv", raw: RawSearchItem): TmdbRes
   };
 }
 
-export async function searchTmdb(kind: "movie" | "tv", query: string): Promise<TmdbResult[]> {
+export async function searchTmdb(kind: "movie" | "tv", query: string, locale: Locale): Promise<TmdbResult[]> {
   const q = query.trim();
   if (!q) return [];
-  const data = await tmdbGet<{ results: RawSearchItem[] }>(`/search/${kind}`, { query: q, include_adult: "false" });
+  const data = await tmdbGet<{ results: RawSearchItem[] }>(`/search/${kind}`, locale, { query: q, include_adult: "false" });
   return data.results.slice(0, 12).map((r) => mapSearchItem(kind, r));
 }
 
@@ -94,10 +97,16 @@ interface RawSeason {
   poster_path?: string | null;
 }
 
-/** Las temporadas de una serie, sin los "especiales" (temporada 0). Cada una tiene su tapa. */
-export async function tvSeasons(tvId: number): Promise<{ posterPath: string | null; genre: string | null; seasons: TmdbSeason[] }> {
-  const data = await tmdbGet<{ poster_path?: string | null; genres?: { name: string }[]; seasons?: RawSeason[] }>(`/tv/${tvId}`);
-  const seasons = (data.seasons ?? [])
+interface RawShow {
+  name?: string;
+  overview?: string;
+  poster_path?: string | null;
+  genres?: { name: string }[];
+  seasons?: RawSeason[];
+}
+
+function mapSeasons(data: RawShow): TmdbSeason[] {
+  return (data.seasons ?? [])
     .filter((s) => s.season_number > 0)
     .map((s) => ({
       seasonNumber: s.season_number,
@@ -106,7 +115,12 @@ export async function tvSeasons(tvId: number): Promise<{ posterPath: string | nu
       episodeCount: s.episode_count ?? null,
       posterPath: s.poster_path ?? null,
     }));
-  return { posterPath: data.poster_path ?? null, genre: genreLabel(data.genres), seasons };
+}
+
+/** Las temporadas de una serie, sin los "especiales" (temporada 0). Cada una tiene su tapa. */
+export async function tvSeasons(tvId: number, locale: Locale): Promise<{ posterPath: string | null; genre: string | null; seasons: TmdbSeason[] }> {
+  const data = await tmdbGet<RawShow>(`/tv/${tvId}`, locale);
+  return { posterPath: data.poster_path ?? null, genre: genreLabel(data.genres), seasons: mapSeasons(data) };
 }
 
 /** Los géneros como se guardan: los dos primeros, separados por coma ("Drama, Crimen"). */
@@ -115,11 +129,42 @@ export function genreLabel(genres: { name: string }[] | undefined): string | nul
   return names.length ? names.join(", ") : null;
 }
 
+interface RawMovie {
+  title?: string;
+  overview?: string;
+  poster_path?: string | null;
+  genres?: { name: string }[];
+  credits?: { crew?: { job: string; name: string }[] };
+}
+
 /** Dirección (puede haber más de una persona) y géneros de una película, en una sola llamada. */
-export async function movieDetails(movieId: number): Promise<{ director: string | null; genre: string | null }> {
-  const data = await tmdbGet<{ genres?: { name: string }[]; credits?: { crew?: { job: string; name: string }[] } }>(`/movie/${movieId}`, {
-    append_to_response: "credits",
-  });
+export async function movieDetails(movieId: number, locale: Locale): Promise<{ director: string | null; genre: string | null }> {
+  const data = await tmdbGet<RawMovie>(`/movie/${movieId}`, locale, { append_to_response: "credits" });
   const names = (data.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
   return { director: names.length ? names.join(", ") : null, genre: genreLabel(data.genres) };
+}
+
+/**
+ * Título, sinopsis, género y tapa de un título de TMDB en cada idioma de la app. En una serie, la
+ * tapa es la de la temporada (si TMDB la tiene en ese idioma; si no, la de la serie). Lo que TMDB
+ * no tiene traducido (una sinopsis vacía) queda afuera y se usa lo común.
+ */
+export async function tmdbTranslations(externalId: string, season?: string | null): Promise<ItemTranslations> {
+  const match = /^(movie|tv):(\d+)$/.exec(externalId);
+  if (!match) return {};
+  const [, kind, id] = match;
+  const out: ItemTranslations = {};
+  await Promise.all(
+    LOCALES.map(async (locale) => {
+      if (kind === "movie") {
+        const m = await tmdbGet<RawMovie>(`/movie/${id}`, locale);
+        out[locale] = { name: m.title, description: m.overview?.trim() || null, genre: genreLabel(m.genres), coverRef: m.poster_path ?? null };
+      } else {
+        const s = await tmdbGet<RawShow>(`/tv/${id}`, locale);
+        const seasonPoster = season ? mapSeasons(s).find((x) => String(x.seasonNumber) === String(season))?.posterPath : null;
+        out[locale] = { name: s.name, description: s.overview?.trim() || null, genre: genreLabel(s.genres), coverRef: seasonPoster ?? s.poster_path ?? null };
+      }
+    }),
+  );
+  return out;
 }

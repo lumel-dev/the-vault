@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildLayout, CORNER, dropTarget, frontNormal, itemShape, toLocal, toWorld } from "@/lib/scene-layout";
 import { matcher, search, wordSimilarity, type Searchable } from "@/lib/search";
+import { messages } from "@/lib/i18n";
 import { whereabouts, whereLabel } from "@/lib/where";
 
 describe("búsqueda en el browser", () => {
@@ -170,8 +171,9 @@ describe("dónde está", () => {
   ];
 
   it("lo dice como en la casa", () => {
-    assert.equal(whereLabel(whereabouts(ordered[2], ordered, shelves)), "Caja 3 · 2.º lugar");
-    assert.equal(whereLabel(whereabouts(ordered[1], ordered, shelves)), "Living · Estante 2 · 1.º lugar");
-    assert.equal(whereLabel(whereabouts(ordered[3], ordered, shelves)), "Sin ubicar · 1.º lugar");
+    assert.equal(whereLabel(whereabouts(ordered[2], ordered, shelves, messages.es)), "Caja 3 · 2.º lugar");
+    assert.equal(whereLabel(whereabouts(ordered[1], ordered, shelves, messages.es)), "Living · Estante 2 · 1.º lugar");
+    assert.equal(whereLabel(whereabouts(ordered[1], ordered, shelves, messages.en)), "Living · Shelf 2 · spot 1");
+    assert.equal(whereLabel(whereabouts(ordered[3], ordered, shelves, messages.es)), "Sin ubicar · 1.º lugar");
   });
 });

@@ -43,12 +43,13 @@ describe("tmdb", () => {
       return Response.json({ results: [{ id: 1, name: "Lost", first_air_date: "2004-09-22", poster_path: null }] });
     }) as typeof fetch;
 
-    const results = await searchTmdb("tv", "lost");
+    const results = await searchTmdb("tv", "lost", "es");
     assert.equal(results[0].title, "Lost");
     assert.equal(results[0].year, "2004");
     assert.equal(seen!.auth, "Bearer secreto");
     assert.ok(!seen!.url.includes("secreto"));
     assert.ok(seen!.url.includes("/search/tv"));
+    assert.ok(seen!.url.includes("language=es-MX"));
   });
 
   it("las temporadas no incluyen los especiales (temporada 0)", async () => {
@@ -62,12 +63,12 @@ describe("tmdb", () => {
         ],
       })) as unknown as typeof fetch;
 
-    const { posterPath, seasons } = await tvSeasons(4607);
+    const { posterPath, seasons } = await tvSeasons(4607, "es");
     assert.equal(posterPath, "/show.jpg");
     assert.deepEqual(seasons, [{ seasonNumber: 1, name: "Temporada 1", year: "2004", episodeCount: 25, posterPath: "/s1.jpg" }]);
   });
 
   it("sin token falla claro en vez de pegarle a la API", async () => {
-    await assert.rejects(searchTmdb("movie", "x"), /TMDB_API_TOKEN/);
+    await assert.rejects(searchTmdb("movie", "x", "es"), /TMDB_API_TOKEN/);
   });
 });

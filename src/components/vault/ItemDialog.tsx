@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { inventoryLabel } from "@/lib/containers";
 import type { ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
+import { useI18n } from "@/lib/i18n/client";
 import { ItemForm } from "./ItemForm";
 
 export type ItemDialogMode = { kind: "edit"; item: VaultItem } | { kind: "create"; type?: ItemType; shelfId: string | null };
@@ -17,14 +18,15 @@ interface Props {
 
 /** Alta y edición. El detalle no es un diálogo: es el panel lateral (`ItemPanel`). */
 export function ItemDialog({ mode, shelves, tmdbEnabled, onClose }: Props) {
+  const { t } = useI18n();
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
         {mode?.kind === "edit" && (
           <>
             <DialogHeader>
-              <DialogTitle>Editar · {inventoryLabel(mode.item.inventoryNumber)}</DialogTitle>
-              <DialogDescription className="sr-only">Cambiá los datos de {mode.item.name}.</DialogDescription>
+              <DialogTitle>{t.dialog.editTitle(inventoryLabel(mode.item.inventoryNumber, t))}</DialogTitle>
+              <DialogDescription className="sr-only">{t.dialog.editDescription(mode.item.name)}</DialogDescription>
             </DialogHeader>
             <ItemForm key={mode.item.id} item={mode.item} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
           </>
@@ -32,8 +34,8 @@ export function ItemDialog({ mode, shelves, tmdbEnabled, onClose }: Props) {
         {mode?.kind === "create" && (
           <>
             <DialogHeader>
-              <DialogTitle>Agregar a la bóveda</DialogTitle>
-              <DialogDescription>Buscalo para traer los datos y la tapa (películas y series en TMDB, libros en Open Library, discos en MusicBrainz) o cargalo a mano. Cada cosa nueva recibe su número de inventario.</DialogDescription>
+              <DialogTitle>{t.dialog.addTitle}</DialogTitle>
+              <DialogDescription>{t.dialog.addDescription}</DialogDescription>
             </DialogHeader>
             <ItemForm defaultType={mode.type} defaultShelfId={mode.shelfId} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
           </>

@@ -5,20 +5,13 @@
 
 import { ITEM_TYPE_KEYS } from "./item-types";
 
-export const SORTS = {
-  manual: "Orden propio",
-  name: "Nombre",
-  genre: "Género",
-  type: "Tipo",
-  year: "Año",
-} as const;
+/** Las etiquetas están en el diccionario: `t.sort[clave]`. */
+export const SORT_KEYS = ["manual", "name", "genre", "type", "year"] as const;
 
-export type SortKey = keyof typeof SORTS;
-
-export const SORT_KEYS = Object.keys(SORTS) as SortKey[];
+export type SortKey = (typeof SORT_KEYS)[number];
 
 export function isSortKey(value: unknown): value is SortKey {
-  return typeof value === "string" && value in SORTS;
+  return typeof value === "string" && (SORT_KEYS as readonly string[]).includes(value);
 }
 
 interface Sortable {

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { createShelf, deleteShelf, updateShelf } from "@/lib/actions/shelves";
 import { clampLevels, CONTAINER_KIND_KEYS, CONTAINER_KINDS, type ContainerKind } from "@/lib/containers";
 import type { VaultShelf } from "@/lib/queries";
+import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { ContainerIcon } from "./ContainerIcon";
 
@@ -38,6 +39,7 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
   const [levels, setLevels] = useState(shelf?.levels ?? CONTAINER_KINDS.shelf.defaultLevels);
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
+  const { t } = useI18n();
   const def = CONTAINER_KINDS[kind];
   const shownLevels = clampLevels(kind, levels);
 
@@ -52,7 +54,7 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
       const input = { name, kind, levels: shownLevels };
       const res = shelf ? await updateShelf(shelf.id, input) : await createShelf(input);
       if (!res.ok) return void toast.error(res.error);
-      toast.success(shelf ? "Contenedor actualizado" : `"${name.trim()}" está en la casa`);
+      toast.success(shelf ? t.toast.containerSaved : t.toast.containerCreated(name.trim()));
       onClose();
     });
   }
@@ -63,7 +65,7 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
     startTransition(async () => {
       const res = await deleteShelf(shelf.id);
       if (!res.ok) return void toast.error(res.error);
-      toast.success(`"${shelf.name}" ya no está; lo que tenía quedó sin ubicar`);
+      toast.success(t.toast.containerDeleted(shelf.name));
       onDeleted(shelf.id);
       onClose();
     });
@@ -72,16 +74,14 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
   return (
     <form onSubmit={save} className="grid gap-5">
       <DialogHeader>
-        <DialogTitle>{shelf ? "Editar contenedor" : "Nuevo contenedor"}</DialogTitle>
+        <DialogTitle>{shelf ? t.container.editTitle : t.container.newTitle}</DialogTitle>
         <DialogDescription>
-          {shelf
-            ? `Tiene ${shelf.count === 1 ? "1 objeto" : `${shelf.count} objetos`}. Si lo borrás, lo que tiene queda sin ubicar.`
-            : "Un mueble o una caja que existe en tu casa. Va a aparecer con su forma en la vista Mueble."}
+          {shelf ? t.container.editDescription(shelf.count) : t.container.newDescription}
         </DialogDescription>
       </DialogHeader>
 
       <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-medium">Qué es</legend>
+        <legend className="mb-2 text-sm font-medium">{t.container.what}</legend>
         <div className="grid grid-cols-3 gap-2">
           {CONTAINER_KIND_KEYS.map((k) => (
             <label
@@ -93,29 +93,29 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
             >
               <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => chooseKind(k)} className="sr-only" />
               <ContainerIcon kind={k} className="size-7" />
-              {CONTAINER_KINDS[k].label}
+              {t.container.kinds[k].label}
             </label>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">{def.hint}.</p>
+        <p className="text-xs text-muted-foreground">{t.container.kinds[kind].hint}.</p>
       </fieldset>
 
       <div className="grid gap-1.5">
-        <Label htmlFor="c-name">Nombre</Label>
-        <Input id="c-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Living, Caja 3, Mueble de la tele" required />
+        <Label htmlFor="c-name">{t.container.name}</Label>
+        <Input id="c-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder={t.container.namePlaceholder} required />
       </div>
 
       {def.maxLevels > 1 && (
         <div className="flex items-center justify-between gap-4">
-          <Label id="c-levels">Estantes</Label>
+          <Label id="c-levels">{t.container.levels}</Label>
           <div role="group" aria-labelledby="c-levels" className="flex items-center gap-1">
-            <Button type="button" variant="outline" size="icon" aria-label="Un estante menos" disabled={shownLevels <= def.minLevels} onClick={() => setLevels(shownLevels - 1)}>
+            <Button type="button" variant="outline" size="icon" aria-label={t.container.lessLevels} disabled={shownLevels <= def.minLevels} onClick={() => setLevels(shownLevels - 1)}>
               <Minus />
             </Button>
             <output className="w-8 text-center font-semibold tabular-nums" aria-live="polite">
               {shownLevels}
             </output>
-            <Button type="button" variant="outline" size="icon" aria-label="Un estante más" disabled={shownLevels >= def.maxLevels} onClick={() => setLevels(shownLevels + 1)}>
+            <Button type="button" variant="outline" size="icon" aria-label={t.container.moreLevels} disabled={shownLevels >= def.maxLevels} onClick={() => setLevels(shownLevels + 1)}>
               <Plus />
             </Button>
           </div>
@@ -125,11 +125,11 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
       <DialogFooter className={cn(shelf && "sm:justify-between")}>
         {shelf && (
           <Button type="button" variant={confirming ? "destructive" : "ghost"} onClick={remove} disabled={pending}>
-            {confirming ? "¿Seguro? Borrar" : "Borrar contenedor"}
+            {confirming ? t.container.confirmDelete : t.container.delete}
           </Button>
         )}
         <Button type="submit" disabled={pending || !name.trim()}>
-          {shelf ? "Guardar" : "Crear"}
+          {shelf ? t.common.save : t.common.create}
         </Button>
       </DialogFooter>
     </form>

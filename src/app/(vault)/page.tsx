@@ -37,7 +37,7 @@ export default async function VaultPage({ searchParams }: { searchParams: Search
       tmdbEnabled={tmdbEnabled()}
       userName={session.user.name ?? ""}
       logout={
-        <form action={logoutAction}>
+        <form key="logout" action={logoutAction}>
           <button
             type="submit"
             className="grid size-9 place-items-center rounded-md text-marker/80 transition hover:bg-marker/10 hover:text-marker"

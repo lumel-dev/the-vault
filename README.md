@@ -13,7 +13,7 @@ con la referencia que guarda la base. Lo que no tiene tapa se ve como una caja n
 nombre escrito en una cinta.
 
 Next.js 16 (App Router, React Compiler), three.js con React Three Fiber, Postgres con Drizzle,
-Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está sólo en español.
+Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está en castellano y en inglés.
 
 ## Qué trae
 
@@ -42,6 +42,11 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está sólo en español.
   por estante, como se ordena a mano.
 - **Temporadas que faltan**: en una serie cargada desde TMDB, la ficha dice cuántas temporadas
   salieron y cuáles no tenés, contando todas las que hay en la casa.
+- **Bilingüe (es/en)**: cada usuario elige el idioma con el selector ES/EN de la barra y queda
+  guardado en su cuenta. Cambia la interfaz y también título, sinopsis, género y tapa de lo que vino
+  de TMDB, al instante: al cargar algo se guardan los dos idiomas (castellano de Latinoamérica e
+  inglés). La búsqueda encuentra por el título en cualquiera ("Tiempos violentos" o "Pulp Fiction").
+  Libros y discos conservan su título original. Antes de entrar, se usa el idioma del navegador.
 - **Sacar de la bóveda** tacha el objeto con fibrón y deja 5 segundos para deshacer.
 
 ## Agregar un tipo o un campo
@@ -99,7 +104,6 @@ dueño de la base, porque la primera migración crea las extensiones `pg_trgm` y
 | `AUTH_SECRET` | Runtime | Firma las sesiones. Si cambia, todos tienen que volver a entrar |
 | `SIGNUP_ENABLED` | Runtime | `true` abre `/registro`. Vacía, nadie puede crear cuentas: abrila para sumar a alguien y cerrala después |
 | `TMDB_API_TOKEN` | Runtime | El "API Read Access Token" de TMDB. Sin él no hay búsqueda ni tapas, y todo se carga a mano |
-| `TMDB_LANGUAGE` | Runtime | Idioma de títulos y sinopsis. Default `es-MX` |
 | `ENVIRONMENT`, `DATABASE_URL_DEV` | Runtime | Sólo para desarrollo: con `development` usa la base de desarrollo y nunca cae en la real |
 
 ## Para tener en cuenta

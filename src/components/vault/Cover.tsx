@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { coverUrl, type CoverSize } from "@/lib/covers";
+import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Sticker } from "./Sticker";
 
@@ -21,6 +22,7 @@ interface Props {
  */
 export function Cover({ type, name, coverSource, coverRef, size = "md", className }: Props) {
   const url = coverUrl(coverSource, coverRef, size);
+  const { t } = useI18n();
   // Un intento con la URL tal cual y otro con una URL distinta (por si la caché tiene una copia
   // sin CORS de antes); recién si fallan los dos, la tapa genérica.
   const [attempt, setAttempt] = useState<{ url: string | null; n: number }>({ url, n: 0 });
@@ -43,7 +45,7 @@ export function Cover({ type, name, coverSource, coverRef, size = "md", classNam
         <img
           ref={img}
           src={src!}
-          alt={`Tapa de ${name}`}
+          alt={t.form.coverAlt(name)}
           loading="lazy"
           // En modo CORS siempre: TMDB sólo manda el header CORS si el pedido trae Origin, y la
           // copia que Chrome cachea de un <img> común después bloquea la textura del 3D.

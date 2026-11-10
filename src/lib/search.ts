@@ -16,6 +16,8 @@ export interface Searchable {
   description?: string | null;
   attributes: Record<string, string>;
   inventoryNumber?: number;
+  /** Títulos en los otros idiomas (`localize`): "Pulp Fiction" encuentra "Tiempos violentos". */
+  aliases?: string[];
 }
 
 export function normalize(text: string): string {
@@ -52,7 +54,7 @@ const FUZZY_THRESHOLD = 0.42;
 export function searchText(item: Searchable): string {
   const number = item.inventoryNumber ? ` ${item.inventoryNumber} ${String(item.inventoryNumber).padStart(4, "0")}` : "";
   return normalize(
-    [item.name, item.brand, item.model, item.description, ...Object.values(item.attributes)].filter(Boolean).join(" ") + number,
+    [item.name, ...(item.aliases ?? []), item.brand, item.model, item.description, ...Object.values(item.attributes)].filter(Boolean).join(" ") + number,
   );
 }
 

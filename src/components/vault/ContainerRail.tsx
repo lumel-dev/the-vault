@@ -2,8 +2,9 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { Layers, Pencil, Plus } from "lucide-react";
-import { ITEM_TYPE_KEYS, ITEM_TYPES } from "@/lib/item-types";
+import { ITEM_TYPE_KEYS } from "@/lib/item-types";
 import type { VaultShelf } from "@/lib/queries";
+import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { ContainerIcon } from "./ContainerIcon";
 import { Sticker } from "./Sticker";
@@ -49,6 +50,7 @@ function Row({
   onEdit?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: DROP_PREFIX + id, disabled: !droppable });
+  const { t } = useI18n();
   return (
     <li ref={setNodeRef} className="group/row relative shrink-0">
       <button
@@ -66,7 +68,7 @@ function Row({
         <span className="truncate">{label}</span>
         <span className="ml-auto flex items-center gap-1.5 pl-2 text-xs tabular-nums">
           {hits ? (
-            <span className="rounded-full bg-marker-red px-1.5 py-px font-semibold text-white" title={`${hits} coinciden con la búsqueda`}>
+            <span className="rounded-full bg-marker-red px-1.5 py-px font-semibold text-white" title={t.rail.hits(hits)}>
               {hits}
             </span>
           ) : null}
@@ -77,7 +79,7 @@ function Row({
         <button
           type="button"
           onClick={onEdit}
-          aria-label={`Editar ${label}`}
+          aria-label={t.rail.editContainer(label)}
           className="absolute top-1/2 right-1.5 hidden size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground opacity-0 transition hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 md:grid"
         >
           <Pencil className="size-3.5" />
@@ -92,10 +94,11 @@ function Row({
  * reciben lo que se suelta encima. En el celular es una fila que se desliza.
  */
 export function ContainerRail({ shelves, unshelved, total, current, hits, dragging, onPick, onEdit, onCreate, type, onType }: Props) {
+  const { t } = useI18n();
   return (
     <nav aria-label="Contenedores" className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <div>
-        <h2 className="mb-1.5 hidden px-2.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase md:block">Contenedores</h2>
+        <h2 className="mb-1.5 hidden px-2.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase md:block">{t.rail.containers}</h2>
         <ul className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0">
           <Row
             id="all"
@@ -103,7 +106,7 @@ export function ContainerRail({ shelves, unshelved, total, current, hits, draggi
             droppable={false}
             dragging={dragging}
             icon={<Layers className="size-5 shrink-0" strokeWidth={1.75} />}
-            label="Toda la casa"
+            label={t.rail.wholeHouse}
             count={total}
             onPick={() => onPick("all")}
           />
@@ -128,7 +131,7 @@ export function ContainerRail({ shelves, unshelved, total, current, hits, draggi
             droppable
             dragging={dragging}
             icon={<ContainerIcon kind={null} />}
-            label="Sin ubicar"
+            label={t.rail.unplaced}
             count={unshelved}
             hits={hits?.get(null)}
             onPick={() => onPick("none")}
@@ -140,15 +143,15 @@ export function ContainerRail({ shelves, unshelved, total, current, hits, draggi
               className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground"
             >
               <Plus className="size-5" strokeWidth={1.75} />
-              Nuevo contenedor
+              {t.rail.newContainer}
             </button>
           </li>
         </ul>
       </div>
 
       <div>
-        <h2 className="mb-1.5 hidden px-2.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase md:block">Stickers</h2>
-        <ul className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:flex-col md:gap-0 md:px-0" aria-label="Filtrar por tipo">
+        <h2 className="mb-1.5 hidden px-2.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase md:block">{t.rail.stickers}</h2>
+        <ul className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:flex-col md:gap-0 md:px-0" aria-label={t.rail.filterByType}>
           {ITEM_TYPE_KEYS.map((k) => {
             const active = type === k;
             return (
@@ -164,7 +167,7 @@ export function ContainerRail({ shelves, unshelved, total, current, hits, draggi
                   )}
                 >
                   <Sticker type={k} />
-                  {ITEM_TYPES[k].plural}
+                  {t.types[k].plural}
                 </button>
               </li>
             );

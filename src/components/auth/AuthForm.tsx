@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FormState } from "@/lib/actions/auth";
+import { useI18n } from "@/lib/i18n/client";
 
 interface Props {
   mode: "login" | "signup";
@@ -16,21 +17,22 @@ interface Props {
 export function AuthForm({ mode, action, signupEnabled }: Props) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const isSignup = mode === "signup";
+  const { t } = useI18n();
 
   return (
     <form action={formAction} className="grid gap-4">
       {isSignup && (
         <div className="grid gap-1.5">
-          <Label htmlFor="name">Nombre</Label>
+          <Label htmlFor="name">{t.auth.name}</Label>
           <Input id="name" name="name" autoComplete="name" required />
         </div>
       )}
       <div className="grid gap-1.5">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t.auth.email}</Label>
         <Input id="email" name="email" type="email" autoComplete="email" required />
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="password">Contraseña</Label>
+        <Label htmlFor="password">{t.auth.password}</Label>
         <Input
           id="password"
           name="password"
@@ -46,21 +48,21 @@ export function AuthForm({ mode, action, signupEnabled }: Props) {
         </p>
       )}
       <Button type="submit" size="lg" disabled={pending} className="mt-1 h-10">
-        {pending ? "Un momento…" : isSignup ? "Crear cuenta" : "Entrar"}
+        {pending ? t.common.loading : isSignup ? t.auth.submitSignup : t.auth.submitLogin}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
         {isSignup ? (
           <>
-            ¿Ya tenés cuenta?{" "}
+            {t.auth.haveAccount}{" "}
             <Link href="/login" className="font-semibold underline underline-offset-4 hover:text-marker-red">
-              Entrá
+              {t.auth.goLogin}
             </Link>
           </>
         ) : signupEnabled ? (
           <>
-            ¿Primera vez?{" "}
+            {t.auth.firstTime}{" "}
             <Link href="/registro" className="font-semibold underline underline-offset-4 hover:text-marker-red">
-              Creá tu cuenta
+              {t.auth.goSignup}
             </Link>
           </>
         ) : null}

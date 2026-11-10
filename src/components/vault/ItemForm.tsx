@@ -133,7 +133,13 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
           onPick={(r) => {
             setName(r.title);
             // Lo que trae el catálogo pisa lo que estaba; el formato elegido queda.
-            setAttrs((a) => ({ ...(a.format ? { format: a.format } : {}), ...(type === "music" && !a.format ? { format: "CD" } : {}), ...r.attributes }));
+            setAttrs((a) => {
+              // El formato elegido queda si vale para este tipo (el form arranca en DVD, que no es
+              // un formato de música); si no, el primero de la lista (CD para un disco).
+              const options = def.fields.find((f) => f.key === "format")?.options;
+              const format = options ? (a.format && options.includes(a.format) ? a.format : options[0]) : undefined;
+              return { ...(format ? { format } : {}), ...r.attributes };
+            });
             setCover(r.cover);
             setExternal({ source: r.catalog, id: r.externalId });
           }}

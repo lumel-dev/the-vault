@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FormState } from "@/lib/actions/auth";
+import { PASSWORD_MIN } from "@/lib/auth/rules";
 import { useI18n } from "@/lib/i18n/client";
 
 interface Props {
@@ -38,7 +39,7 @@ export function AuthForm({ mode, action, signupEnabled }: Props) {
           name="password"
           type="password"
           autoComplete={isSignup ? "new-password" : "current-password"}
-          minLength={isSignup ? 10 : undefined}
+          minLength={isSignup ? PASSWORD_MIN : undefined}
           required
         />
       </div>

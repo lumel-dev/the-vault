@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { signIn, signOut } from "@/lib/auth/auth";
 import { hashPassword } from "@/lib/auth/password";
+import { PASSWORD_MIN } from "@/lib/auth/rules";
 import { requireUserId } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -35,7 +36,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 const signupSchema = z.object({
   name: z.string().trim().min(1).max(80),
   email: z.email().transform((v) => v.toLowerCase()),
-  password: z.string().min(10).max(200),
+  password: z.string().min(PASSWORD_MIN).max(200),
 });
 
 /**
@@ -50,7 +51,7 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const field = parsed.error.issues[0]?.path[0];
-    return { error: field === "email" ? t.errors.badEmail : field === "password" ? t.errors.shortPassword : t.errors.nameMissing };
+    return { error: field === "email" ? t.errors.badEmail : field === "password" ? t.errors.shortPassword(PASSWORD_MIN) : t.errors.nameMissing };
   }
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, parsed.data.email)).limit(1);

@@ -94,6 +94,9 @@ pnpm db:studio     # Drizzle Studio
 Corre en un VPS con Coolify, a partir del `Dockerfile`, junto a un Postgres en el mismo VPS. Cada
 merge a `main` se despliega solo.
 
+El monitor externo (UptimeRobot) pega a `/api/health`, que responde `ok` sin pedir login ni
+tocar la base: avisa si el proceso se cae, no si se cae la base.
+
 **Las migraciones corren al arrancar el contenedor** (`src/instrumentation.ts`): si una falla, el
 server no levanta y Coolify mantiene la versión anterior. El usuario de la base tiene que ser
 dueño de la base, porque la primera migración crea las extensiones `pg_trgm` y `unaccent`.

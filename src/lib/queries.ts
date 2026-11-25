@@ -21,7 +21,6 @@ export async function listItems(userId: string) {
     .select({
       id: items.id,
       shelfId: items.shelfId,
-      level: items.level,
       type: items.type,
       stickerId: items.stickerId,
       name: items.name,

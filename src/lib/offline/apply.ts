@@ -111,7 +111,6 @@ export function applyOp(data: VaultData, op: Op): VaultData {
         ...values(parsed.data, sticker.base),
         stickerId: sticker.id,
         shelfId: knownShelf(data, parsed.data.shelfId),
-        level: 0,
         translations: {},
         position: 0,
         // Todavía sin número: lo da el server al guardarlo (`inventoryLabel` muestra "—").
@@ -145,7 +144,7 @@ export function applyOp(data: VaultData, op: Op): VaultData {
               },
             }
           : {};
-      const item: VaultItem = { ...current, ...next, stickerId: sticker.id, shelfId, level: 0, translations };
+      const item: VaultItem = { ...current, ...next, stickerId: sticker.id, shelfId, translations };
       if (current.shelfId !== shelfId) return { ...data, items: arrive(data.items, item, known) };
       return { ...data, items: data.items.map((i) => (i.id === op.id ? item : i)) };
     }
@@ -159,7 +158,7 @@ export function applyOp(data: VaultData, op: Op): VaultData {
       const rest = data.items.filter((i) => i.id !== op.id);
       const inside = rest.filter((i) => isIn(i, op.shelfId, known));
       const at = insertionPoint(rest, inside, Math.min(op.index, inside.length), data.items.indexOf(moving));
-      const moved = { ...moving, shelfId: op.shelfId, level: 0 };
+      const moved = { ...moving, shelfId: op.shelfId };
       return { ...data, items: [...rest.slice(0, at), moved, ...rest.slice(at)] };
     }
 
@@ -191,7 +190,7 @@ export function applyOp(data: VaultData, op: Op): VaultData {
       return {
         ...data,
         shelves: data.shelves.filter((s) => s.id !== op.id),
-        items: data.items.map((i) => (i.shelfId === op.id ? { ...i, shelfId: null, level: 0 } : i)),
+        items: data.items.map((i) => (i.shelfId === op.id ? { ...i, shelfId: null } : i)),
       };
 
     case "createSticker": {

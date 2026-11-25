@@ -6,7 +6,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { requireUserId } from "@/lib/auth/session";
 import type { ContainerKind } from "@/lib/containers";
 import { db } from "@/lib/db";
-import { items, shelves } from "@/lib/db/schema";
+import { shelves } from "@/lib/db/schema";
 import { messages, type Messages } from "@/lib/i18n";
 import { getUserLocale } from "@/lib/i18n/server";
 import { clientId, shelfSchema, type ShelfInput } from "@/lib/schemas";
@@ -26,7 +26,6 @@ function parse(input: ShelfInput, t: Messages) {
     return { error } as const;
   }
   const kind = parsed.data.kind as ContainerKind;
-  // `shelves.levels` ya no se usa: los estantes salen de lo que tiene el mueble (`flowShelves`).
   return { data: { name: parsed.data.name, kind } } as const;
 }
 
@@ -91,14 +90,10 @@ export async function updateShelf(id: string, input: ShelfInput): Promise<Action
 /** Borra el contenedor; lo que tenía queda "Sin ubicar" (FK con `on delete set null`). */
 export async function deleteShelf(id: string): Promise<ActionResult> {
   const { userId, t } = await session();
-  const rows = await db.transaction(async (tx) => {
-    // Sin contenedor no hay estantes: todo vuelve al nivel 0.
-    await tx.update(items).set({ level: 0 }).where(and(eq(items.shelfId, id), eq(items.userId, userId)));
-    return tx
-      .delete(shelves)
-      .where(and(eq(shelves.id, id), eq(shelves.userId, userId)))
-      .returning({ id: shelves.id });
-  });
+  const rows = await db
+    .delete(shelves)
+    .where(and(eq(shelves.id, id), eq(shelves.userId, userId)))
+    .returning({ id: shelves.id });
   if (!rows.length) return { ok: false, error: t.errors.containerMissing };
   revalidatePath("/");
   return { ok: true, data: undefined };

@@ -18,12 +18,15 @@ import type { VaultItem, VaultShelf } from "@/lib/queries";
 import type { TmdbResult, TmdbSeason } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/client";
+import { useLiveSearch } from "@/lib/use-live-search";
 import { Cover } from "./Cover";
 
 interface Props {
   item?: VaultItem;
   defaultType?: ItemType;
   defaultShelfId?: string | null;
+  /** Lo que ya hay: una temporada nueva de una serie va, de entrada, a donde están las otras. */
+  items?: VaultItem[];
   shelves: VaultShelf[];
   tmdbEnabled: boolean;
   onDone: () => void;
@@ -35,7 +38,7 @@ interface CoverRef {
   ref: string;
 }
 
-export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, shelves, tmdbEnabled, onDone, onCancel }: Props) {
+export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, items = [], shelves, tmdbEnabled, onDone, onCancel }: Props) {
   const editing = Boolean(item);
   const [type, setType] = useState<string>(item?.type ?? defaultType);
   const [name, setName] = useState(item?.name ?? "");
@@ -44,6 +47,8 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
   const [model, setModel] = useState(item?.model ?? "");
   const [shelfId, setShelfId] = useState<string | null>(item ? item.shelfId : defaultShelfId);
   const [level, setLevel] = useState(item?.level ?? 0);
+  // Si el lugar lo eligió la persona, elegir un título del catálogo no lo cambia.
+  const [placeTouched, setPlaceTouched] = useState(false);
   const currentShelf = shelves.find((s) => s.id === shelfId) ?? null;
   // Lo nuevo arranca en DVD: es para lo que más se usa la app.
   const [attrs, setAttrs] = useState<Record<string, string>>(item?.attributes ?? { format: "DVD" });
@@ -59,15 +64,30 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
   const def = typeDef(type);
   const { t } = useI18n();
 
+  /** Al cargar algo nuevo que ya tiene "hermanos" (otra temporada de la misma serie), va con ellos. */
+  function placeLikeSiblings(externalId: string) {
+    if (editing || placeTouched) return;
+    const siblings = items.filter((i) => i.externalId === externalId);
+    if (!siblings.length) return;
+    const season = (i: VaultItem) => Number(i.attributes.season) || 0;
+    const last = siblings.reduce((a, b) => (season(b) > season(a) ? b : a));
+    setShelfId(last.shelfId);
+    setLevel(last.level);
+  }
+
   function setAttr(key: string, value: string) {
     setAttrs((a) => ({ ...a, [key]: value }));
   }
 
   const [round, setRound] = useState(0);
+  // Lo escrito en el buscador de catálogo vive acá y no en el buscador: al cambiar de tipo, el
+  // buscador se rearma y vuelve a buscar lo mismo en el catálogo del tipo nuevo.
+  const [lookup, setLookup] = useState(item?.name ?? "");
 
   /** Después de "Agregar y cargar otro": queda el lugar, el tipo y el formato; lo demás se limpia. */
   function resetForNext() {
     setName("");
+    setLookup("");
     setDescription("");
     setBrand("");
     setModel("");
@@ -111,19 +131,22 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-5">
+    <form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)] gap-5">
       {def.tmdb && (
         <TmdbPicker
           key={`${type}-${round}`}
           kind={def.tmdb}
           enabled={tmdbEnabled}
-          initialQuery={name}
+          query={lookup}
+          onQueryChange={setLookup}
+          searchOnMount={round > 0 || type !== (item?.type ?? defaultType)}
           onPick={(pick) => {
             setName(pick.name);
             setAttrs((a) => ({ ...a, ...pick.attributes }));
             if (pick.overview && !description.trim()) setDescription(pick.overview);
             setCover(pick.posterPath ? { source: "tmdb", ref: pick.posterPath } : null);
             setExternal({ source: "tmdb", id: pick.externalId });
+            placeLikeSiblings(pick.externalId);
           }}
         />
       )}
@@ -131,7 +154,9 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
         <CatalogPicker
           key={`${type}-${round}`}
           catalog={def.catalog}
-          initialQuery={name}
+          query={lookup}
+          onQueryChange={setLookup}
+          searchOnMount={round > 0 || type !== (item?.type ?? defaultType)}
           onPick={(r) => {
             setName(r.title);
             // Lo que trae el catálogo pisa lo que estaba; el formato elegido queda.
@@ -144,6 +169,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
             });
             setCover(r.cover);
             setExternal({ source: r.catalog, id: r.externalId });
+            placeLikeSiblings(r.externalId);
           }}
         />
       )}
@@ -180,6 +206,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
                 onChange={(e) => {
                   setShelfId(e.target.value || null);
                   setLevel(0);
+                  setPlaceTouched(true);
                 }}
               >
                 <option value="">{t.where.unplaced}</option>
@@ -192,7 +219,10 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, s
             </Field>
             {currentShelf && currentShelf.levels > 1 && (
               <Field label={t.form.level} htmlFor="f-level">
-                <NativeSelect id="f-level" value={String(level)} onChange={(e) => setLevel(Number(e.target.value))}>
+                <NativeSelect id="f-level" value={String(level)} onChange={(e) => {
+                  setLevel(Number(e.target.value));
+                  setPlaceTouched(true);
+                }}>
                   {Array.from({ length: currentShelf.levels }, (_, i) => (
                     <option key={i} value={i}>
                       {i === 0 ? t.form.levelTop(1) : i === currentShelf.levels - 1 ? t.form.levelBottom(i + 1) : String(i + 1)}
@@ -296,22 +326,35 @@ interface Pick {
 function TmdbPicker({
   kind,
   enabled,
-  initialQuery,
+  query,
+  onQueryChange,
+  searchOnMount,
   onPick,
 }: {
   kind: "movie" | "tv";
   enabled: boolean;
-  initialQuery: string;
+  query: string;
+  onQueryChange: (q: string) => void;
+  searchOnMount: boolean;
   onPick: (pick: Pick) => void;
 }) {
-  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<TmdbResult[] | null>(null);
   const [show, setShow] = useState<TmdbResult | null>(null);
   const [seasons, setSeasons] = useState<TmdbSeason[] | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [showGenre, setShowGenre] = useState<string | null>(null);
-  const [searching, startSearch] = useTransition();
+  const [loadingSeasons, startSeasons] = useTransition();
   const { t } = useI18n();
+  const live = useLiveSearch(
+    (q) => searchTmdbAction(kind, q),
+    (res) => {
+      if (!res.ok) return void toast.error(res.error);
+      setResults(res.data);
+      setShow(null);
+      setSeasons(null);
+    },
+    { initialQuery: searchOnMount && enabled ? query : "" },
+  );
 
   if (!enabled) {
     return (
@@ -319,18 +362,6 @@ function TmdbPicker({
         {t.form.tmdbOff}
       </p>
     );
-  }
-
-  function search(e?: React.SyntheticEvent) {
-    e?.preventDefault();
-    if (!query.trim()) return;
-    startSearch(async () => {
-      const res = await searchTmdbAction(kind, query);
-      if (!res.ok) return void toast.error(res.error);
-      setResults(res.data);
-      setShow(null);
-      setSeasons(null);
-    });
   }
 
   function choose(r: TmdbResult) {
@@ -358,7 +389,7 @@ function TmdbPicker({
     setShow(r);
     setSelectedSeason(null);
     onPick({ name: r.title, attributes: {}, overview: r.overview, posterPath: r.posterPath, externalId: `tv:${r.id}` });
-    startSearch(async () => {
+    startSeasons(async () => {
       const res = await tvSeasonsAction(r.id);
       if (!res.ok) return void toast.error(res.error);
       setSeasons(res.data.seasons);
@@ -382,22 +413,29 @@ function TmdbPicker({
   }
 
   return (
-    <div className="grid gap-3 rounded-xl border bg-background/40 p-3">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border bg-background/40 p-3">
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && search(e)}
+            onChange={(e) => {
+              onQueryChange(e.target.value);
+              live.schedule(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              live.now(query);
+            }}
             placeholder={kind === "movie" ? t.form.tmdbMovie : t.form.tmdbTv}
-            className="pl-8"
+            className="pr-8 pl-8"
             aria-label={t.form.tmdbAria}
           />
+          {(live.searching || loadingSeasons) && (
+            <Loader2 className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
         </div>
-        <Button type="button" variant="secondary" onClick={search} disabled={searching || !query.trim()}>
-          {searching ? <Loader2 className="animate-spin" /> : t.common.search}
-        </Button>
       </div>
 
       {results && (
@@ -463,47 +501,55 @@ function TmdbPicker({
  */
 function CatalogPicker({
   catalog,
-  initialQuery,
+  query,
+  onQueryChange,
+  searchOnMount,
   onPick,
 }: {
   catalog: "books" | "albums";
-  initialQuery: string;
+  query: string;
+  onQueryChange: (q: string) => void;
+  searchOnMount: boolean;
   onPick: (r: CatalogResult & { catalog: "openlibrary" | "musicbrainz" }) => void;
 }) {
-  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<CatalogResult[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
-  const [searching, startSearch] = useTransition();
   const books = catalog === "books";
   const { t } = useI18n();
-
-  function search(e?: React.SyntheticEvent) {
-    e?.preventDefault();
-    if (!query.trim()) return;
-    startSearch(async () => {
-      const res = await searchCatalogAction(catalog, query);
+  // MusicBrainz acepta un pedido por segundo: con discos se espera más a que se deje de tipear.
+  const live = useLiveSearch(
+    (q) => searchCatalogAction(catalog, q),
+    (res) => {
       if (!res.ok) return void toast.error(res.error);
       setResults(res.data);
-    });
-  }
+    },
+    { delay: books ? 350 : 700, initialQuery: searchOnMount ? query : "" },
+  );
 
   return (
-    <div className="grid gap-3 rounded-xl border bg-background/40 p-3">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border bg-background/40 p-3">
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && search(e)}
+            onChange={(e) => {
+              onQueryChange(e.target.value);
+              live.schedule(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              live.now(query);
+            }}
             placeholder={books ? t.form.booksPlaceholder : t.form.albumsPlaceholder}
-            className="pl-8"
+            className="pr-8 pl-8"
             aria-label={books ? t.form.booksAria : t.form.albumsAria}
           />
+          {live.searching && (
+            <Loader2 className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
         </div>
-        <Button type="button" variant="secondary" onClick={search} disabled={searching || !query.trim()}>
-          {searching ? <Loader2 className="animate-spin" /> : t.common.search}
-        </Button>
       </div>
 
       {results && (

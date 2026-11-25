@@ -19,7 +19,6 @@ const es = {
     create: "Crear",
     close: "Cerrar",
     edit: "Editar",
-    search: "Buscar",
     seeAll: "Ver todo",
     loading: "Un momento…",
   },

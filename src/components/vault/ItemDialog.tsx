@@ -11,13 +11,14 @@ export type ItemDialogMode = { kind: "edit"; item: VaultItem } | { kind: "create
 
 interface Props {
   mode: ItemDialogMode | null;
+  items: VaultItem[];
   shelves: VaultShelf[];
   tmdbEnabled: boolean;
   onClose: () => void;
 }
 
 /** Alta y edición. El detalle no es un diálogo: es el panel lateral (`ItemPanel`). */
-export function ItemDialog({ mode, shelves, tmdbEnabled, onClose }: Props) {
+export function ItemDialog({ mode, items, shelves, tmdbEnabled, onClose }: Props) {
   const { t } = useI18n();
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => !open && onClose()}>
@@ -37,7 +38,7 @@ export function ItemDialog({ mode, shelves, tmdbEnabled, onClose }: Props) {
               <DialogTitle>{t.dialog.addTitle}</DialogTitle>
               <DialogDescription>{t.dialog.addDescription}</DialogDescription>
             </DialogHeader>
-            <ItemForm defaultType={mode.type} defaultShelfId={mode.shelfId} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
+            <ItemForm defaultType={mode.type} defaultShelfId={mode.shelfId} items={items} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
           </>
         )}
       </DialogContent>

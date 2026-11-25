@@ -3,8 +3,8 @@
  * las tapas de Cover Art Archive). Ninguno pide API key. Se consultan sólo desde el server, como
  * TMDB, para no depender de lo que acepte cada browser y para mandar un User-Agent propio.
  *
- * MusicBrainz pide un User-Agent que identifique la app y como mucho un pedido por segundo: la
- * búsqueda se hace al apretar "Buscar", no mientras se tipea, así que alcanza.
+ * MusicBrainz pide un User-Agent que identifique la app y como mucho un pedido por segundo. La
+ * búsqueda corre mientras se tipea, así que `musicBrainzSlot` espacia los pedidos de este proceso.
  */
 
 const USER_AGENT = "TheVault/0.1 ( https://github.com/lumel-dev/the-vault )";
@@ -108,9 +108,20 @@ export function mapAlbum(rg: ReleaseGroup): CatalogResult {
   };
 }
 
+let nextMusicBrainz = 0;
+
+/** Espera hasta que pase un segundo desde el último pedido a MusicBrainz. */
+async function musicBrainzSlot() {
+  const now = Date.now();
+  const at = Math.max(now, nextMusicBrainz);
+  nextMusicBrainz = at + 1000;
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
+
 export async function searchAlbums(query: string): Promise<CatalogResult[]> {
   const q = query.trim();
   if (!q) return [];
+  await musicBrainzSlot();
   const url = new URL("https://musicbrainz.org/ws/2/release-group/");
   url.searchParams.set("query", q);
   url.searchParams.set("fmt", "json");

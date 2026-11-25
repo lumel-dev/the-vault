@@ -9,6 +9,7 @@ import { coverUrl } from "@/lib/covers";
 import type { Messages } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
+import { stickerFor, type VaultSticker } from "@/lib/stickers";
 import { buildLayout, frontNormal, slotIndex, toLocal, toWorld, type PlacedContainer, type PlacedItem, type SceneLayout, type Slot } from "@/lib/scene-layout";
 import {
   buildSpineAtlas,
@@ -25,6 +26,8 @@ import {
 
 export interface VaultSceneProps {
   shelves: VaultShelf[];
+  /** Para el color del sticker de cada lomo. */
+  stickers: VaultSticker[];
   items: VaultItem[];
   /** Lo que coincide con la búsqueda; `null` sin búsqueda. */
   matches: Set<string> | null;
@@ -109,11 +112,11 @@ export default function VaultScene(props: VaultSceneProps) {
   );
 }
 
-function Contents({ shelves, items, matches, selectedId, focusContainer, pendingDelete, onSelect, onSelectContainer, onPlace, coarse, t }: VaultSceneProps & { coarse: boolean; t: Messages }) {
+function Contents({ shelves, stickers, items, matches, selectedId, focusContainer, pendingDelete, onSelect, onSelectContainer, onPlace, coarse, t }: VaultSceneProps & { coarse: boolean; t: Messages }) {
   const mats = useMaterials();
   const layout = useMemo(() => buildLayout(shelves, items), [shelves, items]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const atlas = useAtlas(items, layout);
+  const atlas = useAtlas(items, layout, stickers);
   const [drag, setDrag] = useState<{ id: string; point: THREE.Vector3; target: { slot: Slot; index: number } | null } | null>(null);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
 
@@ -340,12 +343,15 @@ function Contents({ shelves, items, matches, selectedId, focusContainer, pending
 
 /* --------------------------------------------------------------- atlas */
 
-function useAtlas(items: VaultItem[], layout: SceneLayout): SpineAtlas | null {
+function useAtlas(items: VaultItem[], layout: SceneLayout, stickers: VaultSticker[]): SpineAtlas | null {
   const [atlas, setAtlas] = useState<SpineAtlas | null>(null);
   const invalidate = useThree((s) => s.invalidate);
   const key = useMemo(
-    () => items.map((i) => `${i.id}:${i.name}:${i.type}:${i.attributes.season ?? ""}:${i.attributes.format ?? ""}:${i.attributes.discs ?? ""}`).join("|"),
-    [items],
+    () =>
+      items
+        .map((i) => `${i.id}:${i.name}:${i.type}:${stickerFor(i, stickers).color}:${i.attributes.season ?? ""}:${i.attributes.format ?? ""}:${i.attributes.discs ?? ""}`)
+        .join("|"),
+    [items, stickers],
   );
 
   useEffect(() => {
@@ -361,6 +367,7 @@ function useAtlas(items: VaultItem[], layout: SceneLayout): SpineAtlas | null {
             id: i.id,
             name: i.name,
             type: i.type,
+            stickerColor: stickerFor(i, stickers).color,
             shape: placed.get(i.id)!.shape,
             dims: placed.get(i.id)!.dims,
             inventoryNumber: i.inventoryNumber,

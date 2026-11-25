@@ -45,14 +45,17 @@ function blankLast(a: string | undefined, b: string | undefined, compare: (x: st
   return compare(a, b);
 }
 
-export function compareBy(key: SortKey): ((a: Sortable, b: Sortable) => number) | null {
+export function compareBy<T extends Sortable>(key: SortKey, rank?: (item: T) => number): ((a: T, b: T) => number) | null {
   switch (key) {
     case "name":
       return byName;
     case "genre":
       return (a, b) => blankLast(a.attributes.genre, b.attributes.genre, (x, y) => collator.compare(x, y)) || byName(a, b);
     case "type":
-      return (a, b) => ITEM_TYPE_KEYS.indexOf(a.type as never) - ITEM_TYPE_KEYS.indexOf(b.type as never) || byName(a, b);
+      // Con stickers propios, por sticker (en el orden del riel); si no, por tipo.
+      return rank
+        ? (a, b) => rank(a) - rank(b) || byName(a, b)
+        : (a, b) => ITEM_TYPE_KEYS.indexOf(a.type as never) - ITEM_TYPE_KEYS.indexOf(b.type as never) || byName(a, b);
     case "year":
       return (a, b) => blankLast(a.attributes.year, b.attributes.year, (x, y) => Number(x) - Number(y)) || byName(a, b);
     default:
@@ -61,7 +64,7 @@ export function compareBy(key: SortKey): ((a: Sortable, b: Sortable) => number) 
 }
 
 /** Una copia ordenada; con "manual" devuelve la misma lista, en el orden de los muebles. */
-export function sortItems<T extends Sortable>(items: T[], key: SortKey): T[] {
-  const compare = compareBy(key);
+export function sortItems<T extends Sortable>(items: T[], key: SortKey, rank?: (item: T) => number): T[] {
+  const compare = compareBy(key, rank);
   return compare ? [...items].sort(compare) : items;
 }

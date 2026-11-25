@@ -2,7 +2,8 @@ import "server-only";
 
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { items, shelves } from "@/lib/db/schema";
+import { items, shelves, stickers } from "@/lib/db/schema";
+import { defaultStickers } from "@/lib/stickers";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,6 +23,7 @@ export async function listItems(userId: string) {
       shelfId: items.shelfId,
       level: items.level,
       type: items.type,
+      stickerId: items.stickerId,
       name: items.name,
       description: items.description,
       brand: items.brand,
@@ -72,3 +74,42 @@ export async function listShelves(userId: string) {
 }
 
 export type VaultShelf = Awaited<ReturnType<typeof listShelves>>["shelves"][number];
+
+/**
+ * Los stickers del usuario, con cuántos objetos tiene cada uno. Si no tiene ninguno (una cuenta
+ * nueva, o borró todos) se le crean los de fábrica: siempre hay al menos uno para cargar algo.
+ */
+export async function listStickers(userId: string) {
+  await ensureStickers(userId);
+  const counts = db
+    .select({ stickerId: items.stickerId, n: sql<number>`count(*)::int`.as("n") })
+    .from(items)
+    .where(eq(items.userId, userId))
+    .groupBy(items.stickerId)
+    .as("counts");
+  return db
+    .select({
+      id: stickers.id,
+      base: stickers.base,
+      name: stickers.name,
+      color: stickers.color,
+      position: stickers.position,
+      count: sql<number>`coalesce(${counts.n}, 0)`,
+    })
+    .from(stickers)
+    .leftJoin(counts, eq(counts.stickerId, stickers.id))
+    .where(eq(stickers.userId, userId))
+    .orderBy(asc(stickers.position), asc(stickers.createdAt));
+}
+
+export type VaultStickerRow = Awaited<ReturnType<typeof listStickers>>[number];
+
+/** Crea los de fábrica si el usuario no tiene ninguno. El lock evita duplicarlos con dos pestañas. */
+export async function ensureStickers(userId: string) {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+    const [any] = await tx.select({ id: stickers.id }).from(stickers).where(eq(stickers.userId, userId)).limit(1);
+    if (any) return;
+    await tx.insert(stickers).values(defaultStickers().map((d) => ({ ...d, userId })));
+  });
+}

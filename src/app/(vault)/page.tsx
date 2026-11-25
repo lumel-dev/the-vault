@@ -4,7 +4,7 @@ import { VaultApp, type View } from "@/components/vault/VaultApp";
 import { logoutAction } from "@/lib/actions/auth";
 import { auth } from "@/lib/auth/auth";
 import { isItemType } from "@/lib/item-types";
-import { isUuid, listItems, listShelves } from "@/lib/queries";
+import { isUuid, listItems, listShelves, listStickers } from "@/lib/queries";
 import { tmdbEnabled } from "@/lib/tmdb";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -20,17 +20,22 @@ export default async function VaultPage({ searchParams }: { searchParams: Search
 
   const sp = await searchParams;
   const q = one(sp.q).slice(0, 200);
-  const type = isItemType(one(sp.tipo)) ? one(sp.tipo) : "all";
+  // Un sticker (su id) o, en links de antes, un tipo.
+  const rawType = one(sp.tipo);
+  const type = isItemType(rawType) || isUuid(rawType) ? rawType : "all";
   const rawShelf = one(sp.estante);
   const shelf = rawShelf === "none" || isUuid(rawShelf) ? rawShelf : "all";
   const rawView = one(sp.vista);
   const view: View | null = rawView === "mueble" || rawView === "grilla" ? rawView : null;
 
+  // Los stickers primero: si la cuenta no tiene, se crean los de fábrica.
+  const stickers = await listStickers(userId);
   const [items, shelfData] = await Promise.all([listItems(userId), listShelves(userId)]);
 
   return (
     <VaultApp
       items={items}
+      stickers={stickers}
       shelves={shelfData.shelves}
       unshelved={shelfData.unshelved}
       filters={{ q, type, shelf, view, sort: one(sp.orden) }}

@@ -13,17 +13,19 @@ import { searchCatalogAction } from "@/lib/actions/catalogs";
 import { movieDetailsAction, searchTmdbAction, tvSeasonsAction } from "@/lib/actions/tmdb";
 import type { CatalogResult } from "@/lib/catalogs";
 import { inventoryLabel } from "@/lib/containers";
-import { ITEM_TYPE_KEYS, typeDef, type ItemType } from "@/lib/item-types";
+import { typeDef, type ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import type { TmdbResult, TmdbSeason } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/client";
+import { useStickers } from "./StickersContext";
 import { useLiveSearch } from "@/lib/use-live-search";
 import { Cover } from "./Cover";
 
 interface Props {
   item?: VaultItem;
-  defaultType?: ItemType;
+  /** El sticker con el que arranca (el del filtro activo); si no, el primero de películas. */
+  defaultStickerId?: string;
   defaultShelfId?: string | null;
   /** Lo que ya hay: una temporada nueva de una serie va, de entrada, a donde están las otras. */
   items?: VaultItem[];
@@ -38,9 +40,16 @@ interface CoverRef {
   ref: string;
 }
 
-export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, items = [], shelves, tmdbEnabled, onDone, onCancel }: Props) {
+export function ItemForm({ item, defaultStickerId, defaultShelfId = null, items = [], shelves, tmdbEnabled, onDone, onCancel }: Props) {
   const editing = Boolean(item);
-  const [type, setType] = useState<string>(item?.type ?? defaultType);
+  const { stickers, of: stickerOf, label: stickerName } = useStickers();
+  // El sticker manda: el tipo (catálogo, campos, forma) es su `base`.
+  const [stickerId, setStickerId] = useState<string>(
+    () => (item ? stickerOf(item).id : defaultStickerId) || (stickers.find((s) => s.base === "movie") ?? stickers[0])?.id || "",
+  );
+  const sticker = stickers.find((s) => s.id === stickerId) ?? stickerOf(item ?? { stickerId: null, type: "movie" });
+  const type = sticker.base;
+  const [initialType] = useState(type);
   const [name, setName] = useState(item?.name ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [brand, setBrand] = useState(item?.brand ?? "");
@@ -70,6 +79,9 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
     const season = (i: VaultItem) => Number(i.attributes.season) || 0;
     const last = siblings.reduce((a, b) => (season(b) > season(a) ? b : a));
     setShelfId(last.shelfId);
+    // Y con el mismo sticker (si es del mismo tipo: "Anime" en vez de "Series").
+    const theirs = stickerOf(last);
+    if (theirs.id && theirs.base === type) setStickerId(theirs.id);
   }
 
   function setAttr(key: string, value: string) {
@@ -99,6 +111,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
     const again = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "again";
     const input: ItemInput = {
       type,
+      stickerId: sticker.id || null,
       name,
       description,
       brand: def.brandModel ? brand : null,
@@ -135,7 +148,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
           enabled={tmdbEnabled}
           query={lookup}
           onQueryChange={setLookup}
-          searchOnMount={round > 0 || type !== (item?.type ?? defaultType)}
+          searchOnMount={round > 0 || type !== initialType}
           onPick={(pick) => {
             setName(pick.name);
             setAttrs((a) => ({ ...a, ...pick.attributes }));
@@ -152,7 +165,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
           catalog={def.catalog}
           query={lookup}
           onQueryChange={setLookup}
-          searchOnMount={round > 0 || type !== (item?.type ?? defaultType)}
+          searchOnMount={round > 0 || type !== initialType}
           onPick={(r) => {
             setName(r.title);
             // Lo que trae el catálogo pisa lo que estaba; el formato elegido queda.
@@ -172,7 +185,7 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
 
       <div className="grid gap-5 sm:grid-cols-[9.5rem_1fr]">
         <div className="mx-auto w-32 sm:mx-0 sm:w-auto">
-          <Cover type={type} name={name || t.types[type as ItemType].label} coverSource={cover?.source} coverRef={cover?.ref} />
+          <Cover type={type} stickerColor={sticker.color} name={name || t.types[type as ItemType].label} coverSource={cover?.source} coverRef={cover?.ref} />
           {cover && (
             <button
               type="button"
@@ -187,11 +200,11 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
         <div className="grid content-start gap-3.5">
           {/* El estante no se elige: lo nuevo va al último estante con lugar del mueble. */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t.form.type} htmlFor="f-type">
-              <NativeSelect id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
-                {ITEM_TYPE_KEYS.map((k) => (
-                  <option key={k} value={k}>
-                    {t.types[k].label}
+            <Field label={t.form.sticker} htmlFor="f-type">
+              <NativeSelect id="f-type" value={sticker.id} onChange={(e) => setStickerId(e.target.value)}>
+                {stickers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {stickerName(s)}
                   </option>
                 ))}
               </NativeSelect>

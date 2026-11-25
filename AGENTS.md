@@ -66,6 +66,16 @@ contrato; uno que lo cambia, lo actualiza.
   misma función. Las columnas `shelves.levels` e `items.level` quedaron de antes (la migración
   `0004` reordenó lo que había por estante y puso `level` en 0) y no se leen; se pueden borrar en
   un cambio aparte (*contract*).
+- **Stickers** (`stickers`, `src/lib/stickers.ts`): son de cada usuario y cada objeto tiene uno
+  (`items.sticker_id`). `base` es uno de `ITEM_TYPES` y **manda sobre el tipo**: al guardar,
+  `items.type` pasa a ser la `base` del sticker (`resolveSticker`), así que campos, catálogos,
+  forma 3D y orden siguen leyendo `type` como antes. Sin `stickerId` se usa el primero del tipo.
+  `listStickers` crea los seis de fábrica si la cuenta no tiene ninguno (con un advisory lock por
+  usuario). Los de fábrica tienen `name` nulo y se muestran con el nombre del tipo en el idioma
+  de quien mira (`stickerLabel`). El tipo de un sticker con cosas no cambia, y borrar uno con
+  cosas exige pasarlas a otro de la misma `base`: así nunca se pierden atributos. En el cliente,
+  el color y el nombre salen de `useStickers()` (`StickersContext`); el 3D recibe `stickers` por
+  prop (es otro árbol de React).
 - **Número de inventario**: sale de `users.inventory_seq` (un contador), no de `max()+1`, para que
   borrar el último no lo libere. Único por usuario.
 - **`items` es una sola tabla para todos los tipos.** Lo propio de cada tipo va en `attributes`

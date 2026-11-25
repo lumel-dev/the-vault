@@ -12,6 +12,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Cover } from "./Cover";
 import { Sticker } from "./Sticker";
+import { useStickers } from "./StickersContext";
 
 /** Cómo se ve la grilla: tapas grandes, tapas chicas, una lista o los lomos en un estante. */
 export const DENSITIES = ["covers", "small", "list", "spines"] as const;
@@ -50,6 +51,7 @@ export function ItemCardBody({
   small?: boolean;
 }) {
   const { t } = useI18n();
+  const sticker = useStickers().of(item);
   // Con la grilla ordenada por género o año, la línea chica muestra eso: así se ve el agrupamiento.
   const sub = caption ?? subtitle(item.type, item.attributes, t, item.brand, item.model);
   return (
@@ -57,6 +59,7 @@ export function ItemCardBody({
       <div className="relative">
         <Cover
           type={item.type}
+          stickerColor={sticker.color}
           name={item.name}
           coverSource={item.coverSource}
           coverRef={item.coverRef}
@@ -76,7 +79,7 @@ export function ItemCardBody({
         </p>
         {!small && (
           <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-            <Sticker type={item.type} className="size-2.5" />
+            <Sticker color={sticker.color} className="size-2.5" />
             <span className="truncate">{sub || inventoryLabel(item.inventoryNumber, t)}</span>
           </p>
         )}
@@ -88,16 +91,17 @@ export function ItemCardBody({
 /** Una fila de la lista: tapa chiquita, nombre, datos y número de inventario. */
 function ItemRowBody({ item, striking, selected, caption }: { item: VaultItem; striking: boolean; selected: boolean; caption?: string }) {
   const { t } = useI18n();
+  const sticker = useStickers().of(item);
   const sub = caption ?? subtitle(item.type, item.attributes, t, item.brand, item.model);
   return (
     <div className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-card/70", selected && "bg-card ring-2 ring-marker")}>
       <div className="relative w-8 shrink-0">
         {item.coverSource && item.coverRef ? (
-          <Cover type={item.type} name={item.name} coverSource={item.coverSource} coverRef={item.coverRef} size="sm" className="shadow-[0_3px_8px_-4px_rgb(28_27_25/55%)]" />
+          <Cover type={item.type} stickerColor={sticker.color} name={item.name} coverSource={item.coverSource} coverRef={item.coverRef} size="sm" className="shadow-[0_3px_8px_-4px_rgb(28_27_25/55%)]" />
         ) : (
           // Sin tapa, a este tamaño el rótulo no se lee: la caja negra con su sticker alcanza.
           <div className="flex aspect-[2/3] items-start rounded-[2px] bg-[#161617] p-1 shadow-[0_3px_8px_-4px_rgb(28_27_25/55%)]">
-            <Sticker type={item.type} className="size-2" />
+            <Sticker color={sticker.color} className="size-2" />
           </div>
         )}
         {striking && <Strike />}
@@ -105,8 +109,8 @@ function ItemRowBody({ item, striking, selected, caption }: { item: VaultItem; s
       <div className={cn("grid min-w-0 flex-1 text-sm leading-snug", striking && "line-through decoration-marker-red decoration-2")}>
         <p className="truncate font-semibold">{item.name}</p>
         <p className="flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
-          <Sticker type={item.type} className="size-2.5" />
-          <span className="truncate">{sub || t.types[item.type as keyof typeof t.types]?.label}</span>
+          <Sticker color={sticker.color} className="size-2.5" />
+          <span className="truncate">{sub || sticker.label}</span>
         </p>
       </div>
       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{inventoryLabel(item.inventoryNumber, t)}</span>
@@ -128,6 +132,7 @@ const HEIGHT_PX_PER_MM = 0.8;
  */
 function SpineBody({ item, striking, selected }: { item: VaultItem; striking: boolean; selected: boolean }) {
   const { shape, dims } = itemShape(item);
+  const sticker = useStickers().of(item);
   const parcel = shape === "parcel";
   const width = Math.min(64, Math.max(20, dims.t * 1000 * WIDTH_PX_PER_MM));
   const height = Math.min(220, Math.max(90, dims.h * 1000 * HEIGHT_PX_PER_MM));
@@ -142,7 +147,7 @@ function SpineBody({ item, striking, selected }: { item: VaultItem; striking: bo
       )}
       style={{ width, height, background: bg, color: ink } as CSSProperties}
     >
-      {!parcel && <Sticker type={item.type} className="size-2.5 shrink-0" />}
+      {!parcel && <Sticker color={sticker.color} className="size-2.5 shrink-0" />}
       <span
         className={cn(
           "mt-1.5 min-h-0 flex-1 overflow-hidden text-[0.6875rem] font-bold tracking-wide text-ellipsis whitespace-nowrap uppercase [writing-mode:vertical-rl] rotate-180",

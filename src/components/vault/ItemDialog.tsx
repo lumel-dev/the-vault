@@ -2,12 +2,11 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { inventoryLabel } from "@/lib/containers";
-import type { ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n/client";
 import { ItemForm } from "./ItemForm";
 
-export type ItemDialogMode = { kind: "edit"; item: VaultItem } | { kind: "create"; type?: ItemType; shelfId: string | null };
+export type ItemDialogMode = { kind: "edit"; item: VaultItem } | { kind: "create"; stickerId?: string; shelfId: string | null };
 
 interface Props {
   mode: ItemDialogMode | null;
@@ -38,7 +37,7 @@ export function ItemDialog({ mode, items, shelves, tmdbEnabled, onClose }: Props
               <DialogTitle>{t.dialog.addTitle}</DialogTitle>
               <DialogDescription>{t.dialog.addDescription}</DialogDescription>
             </DialogHeader>
-            <ItemForm defaultType={mode.type} defaultShelfId={mode.shelfId} items={items} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
+            <ItemForm defaultStickerId={mode.stickerId} defaultShelfId={mode.shelfId} items={items} shelves={shelves} tmdbEnabled={tmdbEnabled} onDone={onClose} onCancel={onClose} />
           </>
         )}
       </DialogContent>

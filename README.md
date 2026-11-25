@@ -2,6 +2,7 @@
 
 Una web app para llevar el inventario de lo que tenés y saber dónde está: películas y series en
 DVD, libros, música, juegos o cualquier otra cosa. Cada persona tiene su cuenta y su colección.
+Corre en [thevault.lumel.dev](https://thevault.lumel.dev).
 
 La colección se ve de dos maneras. **Mueble** es la casa en 3D: tus estanterías, cajas y muebles
 con puertas acomodados en L contra dos paredes, con cada cosa en su lugar y con su forma real (una caja de DVD de 14 mm, un Blu-ray
@@ -29,7 +30,12 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está en castellano y en inglés.
   lo arrastrás en el mueble.
 - **Tipos de objeto** con sus datos propios: película (formato, año, género, dirección, discos,
   región, edición), serie (lo mismo con temporada), libro, música, videojuego y "otro" (marca y
-  modelo). Cada tipo tiene su sticker de color en el lomo.
+  modelo).
+- **Stickers propios**: la etiqueta de color de cada cosa, en el lomo y en el riel para filtrar.
+  Arrancás con uno por tipo, y podés crear los tuyos (Anime, Clásicos…), renombrarlos, cambiarles
+  el color y borrarlos. Cada sticker dice qué es (película, serie, libro…), y eso decide dónde se
+  buscan los datos y la tapa y qué campos tiene. Para borrar uno con cosas, pasan a otro del mismo
+  tipo.
 - **Número de inventario** correlativo por usuario (N.º 0142), escrito en el lomo: sirve para
   anotarlo en el objeto real. No se reutiliza al borrar.
 - **Alta desde TMDB**: buscás el título y vienen nombre, año, género, sinopsis, dirección y tapa.

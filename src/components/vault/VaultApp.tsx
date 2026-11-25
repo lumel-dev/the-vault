@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { deleteItem, moveItem, placeItem, reorderItems } from "@/lib/actions/items";
 import { isItemType } from "@/lib/item-types";
+import { stickerFor } from "@/lib/stickers";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import { search } from "@/lib/search";
 import { isSortKey, SORT_KEYS, sortItems, type SortKey } from "@/lib/sort";
@@ -39,6 +40,8 @@ import { DENSITIES, isDensity, ItemCard, ItemCardBody, type Density } from "./It
 import { ItemDialog, type ItemDialogMode } from "./ItemDialog";
 import { ItemPanel } from "./ItemPanel";
 import { Sticker } from "./Sticker";
+import { StickerDialog, type StickerDialogMode } from "./StickerDialog";
+import { StickersProvider, useStickers, type StickerWithCount } from "./StickersContext";
 
 // El 3D se baja aparte y sólo en el browser: la búsqueda y la grilla no lo esperan.
 const VaultScene = dynamic(() => import("@/components/vault3d/VaultScene"), {
@@ -58,6 +61,7 @@ export interface Filters {
 
 interface Props {
   items: VaultItem[];
+  stickers: StickerWithCount[];
   shelves: VaultShelf[];
   unshelved: number;
   filters: Filters;
@@ -137,7 +141,7 @@ const collision: CollisionDetection = (args) => {
   return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => !String(c.id).startsWith(DROP_PREFIX)) });
 };
 
-export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdbEnabled, userName, logout }: Props) {
+export function VaultApp({ items: serverItems, stickers, shelves, unshelved, filters, tmdbEnabled, userName, logout }: Props) {
   // Copia local para que mover y ordenar se vean al instante; se pisa con lo que manda el server
   // después de cada acción (`revalidatePath`), y si una acción falla se vuelve atrás.
   const [items, setItems] = useState(serverItems);
@@ -169,7 +173,15 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
   const [urlView, setUrlView] = useState<View | null>(filters.view);
   const view = urlView ?? storedView;
   const [q, setQ] = useState(filters.q);
-  const [type, setType] = useState(isItemType(filters.type) ? filters.type : "all");
+  // El filtro por sticker (su id). Un link viejo con un tipo ("?tipo=movie") elige el primero de ese tipo.
+  const [type, setType] = useState(
+    () => stickers.find((s) => s.id === filters.type)?.id ?? (isItemType(filters.type) ? stickers.find((s) => s.base === filters.type)?.id : undefined) ?? "all",
+  );
+  const [stickerDialog, setStickerDialog] = useState<StickerDialogMode | null>(null);
+  const stickerRank = useMemo(() => {
+    const order = new Map(stickers.map((s, i) => [s.id, i]));
+    return (i: VaultItem) => order.get(stickerFor(i, stickers).id) ?? stickers.length;
+  }, [stickers]);
   const [focus, setFocus] = useState(filters.shelf);
   const [sort, setSort] = useState<SortKey>(isSortKey(filters.sort) ? filters.sort : DEFAULT_SORT);
   const density = useSyncExternalStore(subscribeDensity, readDensity, () => "covers" as Density);
@@ -204,11 +216,11 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
 
   /** Lo que coincide con la búsqueda y el filtro de tipo; `null` cuando no hay ninguno. */
   const matches = useMemo(() => {
-    const ofType = type === "all" ? visibleItems : visibleItems.filter((i) => i.type === type);
+    const ofType = type === "all" ? visibleItems : visibleItems.filter((i) => stickerFor(i, stickers).id === type);
     const found = search(ofType, q);
     if (!found && type === "all") return null;
     return new Set((found ?? ofType).map((i) => i.id));
-  }, [q, type, visibleItems]);
+  }, [q, type, visibleItems, stickers]);
 
   const hits = useMemo(() => {
     if (!matches) return null;
@@ -227,6 +239,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
         (i) => (!matches || matches.has(i.id)) && (focus === "all" || (focus === "none" ? i.shelfId === null : i.shelfId === focus)),
       ),
       sort,
+      stickerRank,
     );
     if (focus !== "all") return [{ id: focus === "none" ? null : focus, items: shown }];
     const known = new Set(shelves.map((s) => s.id));
@@ -234,7 +247,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     return order
       .map((id) => ({ id, items: shown.filter((i) => (id === null ? !i.shelfId || !known.has(i.shelfId) : i.shelfId === id)) }))
       .filter((g) => g.items.length > 0);
-  }, [visibleItems, matches, focus, sort, shelves]);
+  }, [visibleItems, matches, focus, sort, shelves, stickerRank]);
   const gridItems = useMemo(() => gridGroups.flatMap((g) => g.items), [gridGroups]);
 
   const selected = selectedId ? visibleItems.find((i) => i.id === selectedId) ?? null : null;
@@ -315,7 +328,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
   async function arrange(containerId: string | null) {
     const inside = visibleItems.filter((i) => i.shelfId === containerId);
     if (inside.length < 2 || sort === "manual") return;
-    const sorted = sortItems(inside, sort);
+    const sorted = sortItems(inside, sort, stickerRank);
     const before = items;
     const ids = new Set(sorted.map((i) => i.id));
     const rawById = new Map(items.map((i) => [i.id, i]));
@@ -392,6 +405,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
   const matchList = matches && view === "mueble" ? visibleItems.filter((i) => matches.has(i.id)) : [];
 
   return (
+    <StickersProvider stickers={stickers}>
     <DndContext
       id="vault-dnd"
       sensors={sensors}
@@ -410,7 +424,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
           onQuery={setQ}
           view={view}
           onView={pickView}
-          onAdd={() => setItemDialog({ kind: "create", type: isItemType(type) ? type : undefined, shelfId: createShelfId })}
+          onAdd={() => setItemDialog({ kind: "create", stickerId: type !== "all" ? type : undefined, shelfId: createShelfId })}
           userName={userName}
           logout={logout}
           matchCount={matches && q.trim() ? matches.size : null}
@@ -433,6 +447,8 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
               onCreate={() => setContainerDialog({ kind: "create" })}
               type={type}
               onType={setType}
+              onEditSticker={(s) => setStickerDialog({ kind: "edit", sticker: s })}
+              onCreateSticker={() => setStickerDialog({ kind: "create" })}
             />
           </aside>
 
@@ -441,6 +457,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
               <div className="relative h-[68dvh] md:h-full">
                 <VaultScene
                   shelves={shelves}
+                  stickers={stickers}
                   items={visibleItems}
                   matches={matches}
                   selectedId={selectedId}
@@ -519,7 +536,15 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
           if (focus === id) setFocus("all");
         }}
       />
+      <StickerDialog
+        mode={stickerDialog}
+        onClose={() => setStickerDialog(null)}
+        onDeleted={(id) => {
+          if (type === id) setType("all");
+        }}
+      />
     </DndContext>
+    </StickersProvider>
   );
 }
 
@@ -623,6 +648,7 @@ function LogoTape() {
 /** Las coincidencias en texto, al instante, aunque el 3D todavía se esté armando. */
 function MatchStrip({ items, all, shelves, selectedId, onPick }: { items: VaultItem[]; all: VaultItem[]; shelves: VaultShelf[]; selectedId: string | null; onPick: (id: string) => void }) {
   const { t } = useI18n();
+  const { of } = useStickers();
   return (
     <div className="absolute top-3 left-3 z-10 max-h-[30%] md:max-h-[45%] w-[min(22rem,calc(100%-1.5rem))] overflow-y-auto rounded-lg bg-card/95 p-1.5 shadow-[0_10px_30px_-12px_rgb(28_27_25/55%)] backdrop-blur-sm">
       <ul>
@@ -633,7 +659,7 @@ function MatchStrip({ items, all, shelves, selectedId, onPick }: { items: VaultI
               onClick={() => onPick(i.id)}
               className={cn("flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm hover:bg-muted", selectedId === i.id && "bg-tape")}
             >
-              <Sticker type={i.type} className="size-2.5" />
+              <Sticker color={of(i).color} className="size-2.5" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">
                   {i.name}

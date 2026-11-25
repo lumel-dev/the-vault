@@ -102,7 +102,15 @@ SQL; hoy no la usa la app.
   de integración; si cambia el modelo de orden, esos tests son el contrato.
 - "Acomodar así" (vista Mueble) aplica un orden (`sortItems`) a un contenedor con `reorderItems`:
   cambia el orden guardado, estante por estante, sin cambiar a nadie de estante. En la grilla, un
-  orden distinto del propio sólo ordena la vista y apaga el arrastre para reordenar.
+  orden distinto del propio sólo ordena la vista y apaga el reorden (las tarjetas no son droppables),
+  pero se puede seguir arrastrando a un contenedor del riel.
+- Sin `orden` en la URL la grilla va por nombre (`DEFAULT_SORT`). En "Toda la casa" se agrupa por
+  contenedor (`gridGroups`, en el orden del riel y "Sin ubicar" al final); `gridItems` es la
+  concatenación de los grupos, así los índices del reorden son los de lo que se ve. Soltar una
+  tarjeta sobre otra de otro contenedor la mueve a ese contenedor.
+- La densidad de la grilla (`covers`, `small`, `list`, `spines`, en `ItemCard.tsx`) es del browser
+  (localStorage), como la vista. Los lomos toman ancho y alto de `itemShape` y el color de
+  `src/lib/spines.ts`, el mismo módulo que usa el 3D (sin three.js, para no cargarlo en la grilla).
 - `VaultApp` mantiene una copia local de los items para que mover se vea al instante; se pisa con
   lo que manda el server tras cada action (`revalidatePath("/")`) y vuelve atrás si la action
   falla.

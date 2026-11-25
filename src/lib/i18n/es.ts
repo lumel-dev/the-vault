@@ -77,6 +77,8 @@ const es = {
     arrange: (name: string) => `Acomodar ${name} así`,
   },
   grid: {
+    density: "Cómo se ve",
+    densities: { covers: "Tapas", small: "Chicas", list: "Lista", spines: "Lomos" },
     objects: (n: number) => (n === 1 ? "1 objeto" : `${n} objetos`),
     emptyTitle: "La casa está vacía",
     emptyBody: "Contale qué muebles y cajas tenés, y cargá lo que hay en cada uno.",
@@ -84,7 +86,7 @@ const es = {
     nothingOfType: "No hay nada de este tipo acá",
     seeWholeHouse: "Ver toda la casa",
     hintManual: "Arrastrá una tapa sobre un contenedor para guardarla ahí, o entre las demás para cambiarle el orden.",
-    hintSorted: (by: string, manual: string) => `Ordenado por ${by}. Para acomodar a mano, volvé a "${manual}".`,
+    hintSorted: (by: string, manual: string) => `Ordenado por ${by}. Arrastrá algo sobre un contenedor para guardarlo ahí; para acomodar a mano, elegí "${manual}".`,
     cardAria: (name: string) => `${name}. Enter para ver dónde está; espacio para arrastrar.`,
     noGenre: "Sin género",
     noYear: "Sin año",

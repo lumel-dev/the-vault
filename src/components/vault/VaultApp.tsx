@@ -34,7 +34,8 @@ import { cn } from "@/lib/utils";
 import { whereabouts, whereLabel } from "@/lib/where";
 import { ContainerDialog, type ContainerDialogMode } from "./ContainerDialog";
 import { ContainerRail, DROP_PREFIX } from "./ContainerRail";
-import { ItemCard, ItemCardBody } from "./ItemCard";
+import { ContainerIcon } from "./ContainerIcon";
+import { DENSITIES, isDensity, ItemCard, ItemCardBody, type Density } from "./ItemCard";
 import { ItemDialog, type ItemDialogMode } from "./ItemDialog";
 import { ItemPanel } from "./ItemPanel";
 import { Sticker } from "./Sticker";
@@ -90,6 +91,33 @@ function saveView(view: View) {
   window.dispatchEvent(new Event("vault:view"));
 }
 
+/* Lo mismo con la densidad de la grilla: tapas, tapas chicas, lista o lomos. */
+const DENSITY_KEY = "vault:density";
+function subscribeDensity(cb: () => void) {
+  window.addEventListener("storage", cb);
+  window.addEventListener("vault:density", cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener("vault:density", cb);
+  };
+}
+function readDensity(): Density {
+  try {
+    const saved = localStorage.getItem(DENSITY_KEY);
+    if (isDensity(saved)) return saved;
+  } catch {}
+  return "covers";
+}
+function saveDensity(density: Density) {
+  try {
+    localStorage.setItem(DENSITY_KEY, density);
+  } catch {}
+  window.dispatchEvent(new Event("vault:density"));
+}
+
+/** Sin orden en la URL, la grilla va alfabética: es como se busca algo con la vista. */
+const DEFAULT_SORT: SortKey = "name";
+
 function subscribeNarrow(cb: () => void) {
   const mq = window.matchMedia("(max-width: 767px)");
   mq.addEventListener("change", cb);
@@ -136,7 +164,8 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
   const [q, setQ] = useState(filters.q);
   const [type, setType] = useState(isItemType(filters.type) ? filters.type : "all");
   const [focus, setFocus] = useState(filters.shelf);
-  const [sort, setSort] = useState<SortKey>(isSortKey(filters.sort) ? filters.sort : "manual");
+  const [sort, setSort] = useState<SortKey>(isSortKey(filters.sort) ? filters.sort : DEFAULT_SORT);
+  const density = useSyncExternalStore(subscribeDensity, readDensity, () => "covers" as Density);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [itemDialog, setItemDialog] = useState<ItemDialogMode | null>(null);
   const [containerDialog, setContainerDialog] = useState<ContainerDialogMode | null>(null);
@@ -152,7 +181,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     if (type !== "all") params.set("tipo", type);
     if (focus !== "all") params.set("estante", focus);
     if (urlView) params.set("vista", urlView);
-    if (sort !== "manual") params.set("orden", sort);
+    if (sort !== DEFAULT_SORT) params.set("orden", sort);
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
   }, [q, type, focus, urlView, sort]);
@@ -181,16 +210,25 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     return out;
   }, [matches, visibleItems]);
 
-  const gridItems = useMemo(
-    () =>
-      sortItems(
-        visibleItems.filter(
-          (i) => (!matches || matches.has(i.id)) && (focus === "all" || (focus === "none" ? i.shelfId === null : i.shelfId === focus)),
-        ),
-        sort,
+  /**
+   * En "Toda la casa" la grilla va por contenedor, en el orden del riel y "Sin ubicar" al final, y
+   * cada uno con el orden elegido. `gridItems` es la concatenación: el orden en que se ven.
+   */
+  const gridGroups = useMemo(() => {
+    const shown = sortItems(
+      visibleItems.filter(
+        (i) => (!matches || matches.has(i.id)) && (focus === "all" || (focus === "none" ? i.shelfId === null : i.shelfId === focus)),
       ),
-    [visibleItems, matches, focus, sort],
-  );
+      sort,
+    );
+    if (focus !== "all") return [{ id: focus === "none" ? null : focus, items: shown }];
+    const known = new Set(shelves.map((s) => s.id));
+    const order: (string | null)[] = [...shelves.map((s) => s.id), null];
+    return order
+      .map((id) => ({ id, items: shown.filter((i) => (id === null ? !i.shelfId || !known.has(i.shelfId) : i.shelfId === id)) }))
+      .filter((g) => g.items.length > 0);
+  }, [visibleItems, matches, focus, sort, shelves]);
+  const gridItems = useMemo(() => gridGroups.flatMap((g) => g.items), [gridGroups]);
 
   const selected = selectedId ? visibleItems.find((i) => i.id === selectedId) ?? null : null;
   const total = items.length;
@@ -310,7 +348,19 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
       } else toast.success(t.toast.moved(visibleItems.find((i) => i.id === id)?.name ?? item.name, shelves.find((s) => s.id === target)?.name ?? t.where.unplaced));
       return;
     }
-    if (id === overId) return;
+    if (id === overId || sort !== "manual") return;
+    const dragged = items.find((i) => i.id === id);
+    const target = items.find((i) => i.id === overId);
+    // Soltado sobre un objeto de otro contenedor (la grilla agrupada): va a ese contenedor.
+    if (dragged && target && dragged.shelfId !== target.shelfId) {
+      setItems((curr) => [{ ...dragged, shelfId: target.shelfId, level: 0 }, ...curr.filter((i) => i.id !== id)]);
+      const res = await moveItem(id, target.shelfId);
+      if (!res.ok) {
+        setItems(before);
+        toast.error(res.error);
+      } else toast.success(t.toast.moved(visibleItems.find((i) => i.id === id)?.name ?? dragged.name, shelves.find((s) => s.id === target.shelfId)?.name ?? t.where.unplaced));
+      return;
+    }
     const from = gridItems.findIndex((i) => i.id === id);
     const to = gridItems.findIndex((i) => i.id === overId);
     if (from < 0 || to < 0) return;
@@ -407,6 +457,11 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
             ) : (
               <GridView
                 items={gridItems}
+                groups={focus === "all" ? gridGroups : null}
+                shelves={shelves}
+                onFocus={setFocus}
+                density={density}
+                onDensity={saveDensity}
                 total={total}
                 filtering={Boolean(matches)}
                 pendingDelete={pendingDelete}
@@ -619,6 +674,11 @@ function EmptyVault({ onAdd, onContainer }: { onAdd: () => void; onContainer: ()
 
 function GridView({
   items,
+  groups,
+  shelves,
+  onFocus,
+  density,
+  onDensity,
   total,
   filtering,
   pendingDelete,
@@ -633,6 +693,12 @@ function GridView({
   title,
 }: {
   items: VaultItem[];
+  /** Por contenedor ("Toda la casa"); `null` cuando se mira uno solo. */
+  groups: { id: string | null; items: VaultItem[] }[] | null;
+  shelves: VaultShelf[];
+  onFocus: (id: string) => void;
+  density: Density;
+  onDensity: (d: Density) => void;
   total: number;
   filtering: boolean;
   pendingDelete: Set<string>;
@@ -654,7 +720,10 @@ function GridView({
         <h2 className="text-xl font-bold tracking-tight">
           {title} <span className="ml-1 text-sm font-normal text-muted-foreground tabular-nums">{t.grid.objects(items.length)}</span>
         </h2>
-        <SortSelect sort={sort} onSort={onSort} />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <DensitySwitch density={density} onDensity={onDensity} />
+          <SortSelect sort={sort} onSort={onSort} />
+        </div>
       </div>
       {items.length === 0 ? (
         total === 0 ? (
@@ -681,17 +750,100 @@ function GridView({
         )
       ) : (
         <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-4 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
-            {items.map((item) => (
-              <ItemCard key={item.id} item={item} onOpen={onOpen} striking={pendingDelete.has(item.id)} selected={selectedId === item.id} sortable={manual} caption={captionFor(item, sort, t)} />
-            ))}
-          </ul>
+          {groups ? (
+            <div className="grid gap-7">
+              {groups.map((g) => {
+                const shelf = g.id ? shelves.find((s) => s.id === g.id) : undefined;
+                const name = shelf?.name ?? t.rail.unplaced;
+                return (
+                  <section key={g.id ?? "none"} aria-label={name}>
+                    <h3 className="mb-3">
+                      <button
+                        type="button"
+                        onClick={() => onFocus(g.id ?? "none")}
+                        className="inline-flex items-center gap-2 text-left text-marker hover:opacity-80"
+                      >
+                        <ContainerIcon kind={shelf?.kind ?? null} className="size-4" />
+                        <span className="tape -rotate-1 px-2.5 py-0.5 text-base">{name}</span>
+                        <span className="text-xs text-muted-foreground tabular-nums">{g.items.length}</span>
+                      </button>
+                    </h3>
+                    <ItemList items={g.items} density={density} pendingDelete={pendingDelete} selectedId={selectedId} onOpen={onOpen} sort={sort} />
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <ItemList items={items} density={density} pendingDelete={pendingDelete} selectedId={selectedId} onOpen={onOpen} sort={sort} />
+          )}
         </SortableContext>
       )}
       <p className="mt-6 text-xs text-muted-foreground">
         {manual ? t.grid.hintManual : t.grid.hintSorted(t.sort[sort].toLowerCase(), t.sort.manual)}
       </p>
     </section>
+  );
+}
+
+const LIST_CLASS: Record<Density, string> = {
+  covers: "grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-4 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]",
+  small: "grid grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] gap-x-2.5 gap-y-3 sm:grid-cols-[repeat(auto-fill,minmax(5.25rem,1fr))]",
+  list: "grid gap-0.5 md:grid-cols-2 md:gap-x-6",
+  // Los lomos, parados sobre una tabla: cada renglón que se arma al envolver es un estante.
+  spines: "flex flex-wrap items-end gap-y-3 [&>li]:border-b-[6px] [&>li]:border-[#4a3c30]",
+};
+
+function ItemList({
+  items,
+  density,
+  pendingDelete,
+  selectedId,
+  onOpen,
+  sort,
+}: {
+  items: VaultItem[];
+  density: Density;
+  pendingDelete: Set<string>;
+  selectedId: string | null;
+  onOpen: (i: VaultItem) => void;
+  sort: SortKey;
+}) {
+  const { t } = useI18n();
+  return (
+    <ul className={LIST_CLASS[density]}>
+      {items.map((item) => (
+        <ItemCard
+          key={item.id}
+          item={item}
+          onOpen={onOpen}
+          striking={pendingDelete.has(item.id)}
+          selected={selectedId === item.id}
+          sortable={sort === "manual"}
+          caption={captionFor(item, sort, t)}
+          density={density}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function DensitySwitch({ density, onDensity }: { density: Density; onDensity: (d: Density) => void }) {
+  const { t } = useI18n();
+  return (
+    <div role="radiogroup" aria-label={t.grid.density} className="flex h-8 overflow-hidden rounded-md border-2 border-marker text-xs font-semibold">
+      {DENSITIES.map((d) => (
+        <button
+          key={d}
+          type="button"
+          role="radio"
+          aria-checked={density === d}
+          onClick={() => onDensity(d)}
+          className={cn("px-2.5 transition-colors", density === d ? "bg-marker text-white" : "bg-card/50 text-marker hover:bg-card")}
+        >
+          {t.grid.densities[d]}
+        </button>
+      ))}
+    </div>
   );
 }
 

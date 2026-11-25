@@ -6,7 +6,9 @@ DVD, libros, música, juegos o cualquier otra cosa. Cada persona tiene su cuenta
 La colección se ve de dos maneras. **Mueble** es la casa en 3D: tus estanterías, cajas y muebles
 con puertas acomodados en L contra dos paredes, con cada cosa en su lugar y con su forma real (una caja de DVD de 14 mm, un Blu-ray
 más bajo, un vinilo, un libro). Los DVDs se ven de lomo; al tocar uno se desliza afuera y gira
-mostrando la tapa. **Grilla** es la vista plana de tapas, para cargar y buscar rápido.
+mostrando la tapa. **Grilla** es la vista plana, para cargar y buscar rápido: en "Toda la casa"
+va separada por contenedor, y se puede ver con tapas grandes, tapas chicas, en lista o como lomos
+parados en un estante (con el alto real de cada cosa).
 
 Las tapas no se guardan en ningún lado: se piden en vivo a [TMDB](https://www.themoviedb.org)
 con la referencia que guarda la base. Lo que no tiene tapa se ve como una caja negra con el
@@ -37,8 +39,8 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está en castellano y en inglés.
   marca, descripción o número de inventario, sin importar acentos y tolerando errores de tipeo
   ("matirx" encuentra Matrix). En el mueble, lo que no coincide se apaga en su lugar y cada
   coincidencia queda señalada con una flecha de fibrón; la lista de arriba dice dónde está cada una.
-- **Ordenar** por nombre (sin contar "El", "La", "The"…), género, tipo o año. En la grilla ordena
-  lo que ves; en el mueble, con un contenedor elegido, "Acomodar así" lo ordena de verdad, estante
+- **Ordenar** por nombre (sin contar "El", "La", "The"…; es el orden de entrada), género, tipo,
+  año o el orden propio que armaste arrastrando. En la grilla ordena lo que ves; en el mueble, con un contenedor elegido, "Acomodar así" lo ordena de verdad, estante
   por estante, como se ordena a mano.
 - **Temporadas que faltan**: en una serie cargada desde TMDB, la ficha dice cuántas temporadas
   salieron y cuáles no tenés, contando todas las que hay en la casa.

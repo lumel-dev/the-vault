@@ -19,10 +19,13 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está en castellano y en inglés.
 
 ## Qué trae
 
-- **Contenedores** con forma: estantería abierta (con la cantidad de estantes que tenga), caja y
-  mueble con puertas (las puertas se abren solas cuando hay que mirar adentro). Cada uno lleva su
-  nombre en una cinta de papel escrita con fibrón. Lo que no está en ningún lado queda en la mesa
-  de "Sin ubicar".
+- **Contenedores** con forma: estantería abierta, caja y mueble con puertas (las puertas se abren
+  solas cuando hay que mirar adentro). Cada uno lleva su nombre en una cinta de papel escrita con
+  fibrón. Lo que no está en ningún lado queda en la mesa de "Sin ubicar".
+- **Los estantes se ponen solos.** Las estanterías y los muebles miden 80 cm de ancho: lo que
+  guardás llena el estante de arriba y, cuando no entra más, pasa al siguiente; el mueble tiene
+  los estantes que hagan falta. Lo nuevo va al final (el último estante con lugar), y para ponerlo
+  en otro lado lo arrastrás en el mueble.
 - **Tipos de objeto** con sus datos propios: película (formato, año, género, dirección, discos,
   región, edición), serie (lo mismo con temporada), libro, música, videojuego y "otro" (marca y
   modelo). Cada tipo tiene su sticker de color en el lomo.

@@ -46,10 +46,8 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
   const [brand, setBrand] = useState(item?.brand ?? "");
   const [model, setModel] = useState(item?.model ?? "");
   const [shelfId, setShelfId] = useState<string | null>(item ? item.shelfId : defaultShelfId);
-  const [level, setLevel] = useState(item?.level ?? 0);
   // Si el lugar lo eligió la persona, elegir un título del catálogo no lo cambia.
   const [placeTouched, setPlaceTouched] = useState(false);
-  const currentShelf = shelves.find((s) => s.id === shelfId) ?? null;
   // Lo nuevo arranca en DVD: es para lo que más se usa la app.
   const [attrs, setAttrs] = useState<Record<string, string>>(item?.attributes ?? { format: "DVD" });
   const [cover, setCover] = useState<CoverRef | null>(
@@ -72,7 +70,6 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
     const season = (i: VaultItem) => Number(i.attributes.season) || 0;
     const last = siblings.reduce((a, b) => (season(b) > season(a) ? b : a));
     setShelfId(last.shelfId);
-    setLevel(last.level);
   }
 
   function setAttr(key: string, value: string) {
@@ -107,7 +104,6 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
       brand: def.brandModel ? brand : null,
       model: def.brandModel ? model : null,
       shelfId,
-      level: currentShelf ? Math.min(level, currentShelf.levels - 1) : 0,
       attributes: attrs,
       coverSource: cover?.source ?? null,
       coverRef: cover?.ref ?? null,
@@ -189,7 +185,8 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
         </div>
 
         <div className="grid content-start gap-3.5">
-          <div className={cn("grid gap-3", currentShelf && currentShelf.levels > 1 ? "grid-cols-3" : "grid-cols-2")}>
+          {/* El estante no se elige: lo nuevo va al último estante con lugar del mueble. */}
+          <div className="grid grid-cols-2 gap-3">
             <Field label={t.form.type} htmlFor="f-type">
               <NativeSelect id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
                 {ITEM_TYPE_KEYS.map((k) => (
@@ -205,7 +202,6 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
                 value={shelfId ?? ""}
                 onChange={(e) => {
                   setShelfId(e.target.value || null);
-                  setLevel(0);
                   setPlaceTouched(true);
                 }}
               >
@@ -217,20 +213,6 @@ export function ItemForm({ item, defaultType = "movie", defaultShelfId = null, i
                 ))}
               </NativeSelect>
             </Field>
-            {currentShelf && currentShelf.levels > 1 && (
-              <Field label={t.form.level} htmlFor="f-level">
-                <NativeSelect id="f-level" value={String(level)} onChange={(e) => {
-                  setLevel(Number(e.target.value));
-                  setPlaceTouched(true);
-                }}>
-                  {Array.from({ length: currentShelf.levels }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i === 0 ? t.form.levelTop(1) : i === currentShelf.levels - 1 ? t.form.levelBottom(i + 1) : String(i + 1)}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-            )}
           </div>
 
           <Field label={t.form.name} htmlFor="f-name">

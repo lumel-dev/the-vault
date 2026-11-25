@@ -102,7 +102,6 @@ const es = {
   },
   toast: {
     moved: (item: string, place: string) => `${item} → ${place}`,
-    level: (n: number) => `estante ${n}`,
     arranged: (container: string, by: string) => `${container} quedó ordenado por ${by}`,
     leaving: (name: string) => `${name} sale de la bóveda`,
     undo: "Deshacer",
@@ -146,9 +145,6 @@ const es = {
   form: {
     type: "Tipo",
     where: "Dónde está",
-    level: "Estante",
-    levelTop: (n: number) => `${n} (arriba)`,
-    levelBottom: (n: number) => `${n} (abajo)`,
     name: "Nombre",
     description: "Descripción",
     removeCover: "Quitar tapa",
@@ -177,9 +173,6 @@ const es = {
     what: "Qué es",
     name: "Nombre",
     namePlaceholder: "Living, Caja 3, Mueble de la tele",
-    levels: "Estantes",
-    lessLevels: "Un estante menos",
-    moreLevels: "Un estante más",
     delete: "Borrar contenedor",
     confirmDelete: "¿Seguro? Borrar",
     kinds: {

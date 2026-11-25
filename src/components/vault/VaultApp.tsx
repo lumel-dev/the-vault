@@ -31,7 +31,7 @@ import { LOCALES, type Locale, type Messages } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
 import { localize } from "@/lib/localized";
 import { cn } from "@/lib/utils";
-import { whereabouts, whereLabel } from "@/lib/where";
+import { shelfSpots, whereabouts, whereLabel } from "@/lib/where";
 import { ContainerDialog, type ContainerDialogMode } from "./ContainerDialog";
 import { ContainerRail, DROP_PREFIX } from "./ContainerRail";
 import { ContainerIcon } from "./ContainerIcon";
@@ -113,6 +113,13 @@ function saveDensity(density: Density) {
     localStorage.setItem(DENSITY_KEY, density);
   } catch {}
   window.dispatchEvent(new Event("vault:density"));
+}
+
+/** Lo mismo que hace el server al mover algo: a un mueble llega al final; a "Sin ubicar", primero. */
+function arrive(list: VaultItem[], item: VaultItem, shelfId: string | null): VaultItem[] {
+  const rest = list.filter((i) => i.id !== item.id);
+  const moved = { ...item, shelfId, level: 0 };
+  return shelfId ? [...rest, moved] : [moved, ...rest];
 }
 
 /** Sin orden en la URL, la grilla va alfabética: es como se busca algo con la vista. */
@@ -238,36 +245,39 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     saveView(next);
   }
 
-  /** Soltar un objeto en un lugar concreto (la vista 3D). */
+  /**
+   * Soltar un objeto en un lugar concreto (la vista 3D): estante y lugar en ese estante. Se guarda
+   * como el lugar dentro de todo el mueble; los estantes se vuelven a repartir solos.
+   */
   async function place(itemId: string, containerId: string | null, level: number, index: number) {
     const before = items;
     const moving = items.find((i) => i.id === itemId);
     if (!moving) return;
-    const shelf = shelves.find((s) => s.id === containerId);
-    const eff = (i: VaultItem) => {
-      const s = shelves.find((x) => x.id === i.shelfId);
-      return s ? Math.min(i.level, s.levels - 1) : 0;
-    };
+    const shelf = shelves.find((s) => s.id === containerId) ?? null;
     const rest = items.filter((i) => i.id !== itemId);
-    const neighbours = rest.filter((i) => i.shelfId === containerId && eff(i) === level);
+    const inside = rest.filter((i) => (shelf ? i.shelfId === shelf.id : !shelves.some((s) => s.id === i.shelfId)));
+    const spots = shelfSpots(shelf, inside);
+    // Lo de los estantes de arriba va antes; después, el lugar dentro del estante.
+    const flat = Math.min(inside.length, index + inside.filter((i) => (spots.get(i.id)?.level ?? 0) < level).length);
     const insertAt =
-      index < neighbours.length
-        ? rest.indexOf(neighbours[index])
-        : neighbours.length
-          ? rest.indexOf(neighbours[neighbours.length - 1]) + 1
+      flat < inside.length
+        ? rest.indexOf(inside[flat])
+        : inside.length
+          ? rest.indexOf(inside[inside.length - 1]) + 1
           : Math.min(items.indexOf(moving), rest.length);
+    const moved = { ...moving, shelfId: containerId, level: 0 };
     const next = [...rest];
-    next.splice(insertAt, 0, { ...moving, shelfId: containerId, level });
+    next.splice(insertAt, 0, moved);
     setItems(next);
-    const res = await placeItem(itemId, containerId, level, index);
+    const res = await placeItem(itemId, containerId, flat);
     if (!res.ok) {
       setItems(before);
       toast.error(res.error);
       return;
     }
-    const levelText = shelf && shelf.levels > 1 ? ` · ${t.toast.level(level + 1)}` : "";
     const shownName = visibleItems.find((i) => i.id === itemId)?.name ?? moving.name;
-    toast.success(t.toast.moved(shownName, `${shelf?.name ?? t.where.unplaced}${levelText}`));
+    const w = whereabouts(moved, next, shelves, t);
+    toast.success(t.toast.moved(shownName, [w.container, w.level].filter(Boolean).join(" · ")));
   }
 
   /** Sacar de la bóveda: se tacha con fibrón y queda 5 segundos para deshacer. */
@@ -340,7 +350,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
       const target = key === "none" ? null : key;
       const item = items.find((i) => i.id === id);
       if (!item || item.shelfId === target) return;
-      setItems((curr) => [{ ...item, shelfId: target, level: 0 }, ...curr.filter((i) => i.id !== id)]);
+      setItems((curr) => arrive(curr, item, target));
       const res = await moveItem(id, target);
       if (!res.ok) {
         setItems(before);
@@ -353,7 +363,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
     const target = items.find((i) => i.id === overId);
     // Soltado sobre un objeto de otro contenedor (la grilla agrupada): va a ese contenedor.
     if (dragged && target && dragged.shelfId !== target.shelfId) {
-      setItems((curr) => [{ ...dragged, shelfId: target.shelfId, level: 0 }, ...curr.filter((i) => i.id !== id)]);
+      setItems((curr) => arrive(curr, dragged, target.shelfId));
       const res = await moveItem(id, target.shelfId);
       if (!res.ok) {
         setItems(before);

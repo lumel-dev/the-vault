@@ -36,7 +36,6 @@ const itemSchema = z.object({
   brand: optionalText(120),
   model: optionalText(120),
   shelfId: z.uuid().nullish().transform((v) => v ?? null),
-  level: z.number().int().min(0).max(20).default(0),
   attributes: z.record(z.string(), z.unknown()).default({}),
   coverSource: z.string().nullish(),
   coverRef: z.string().nullish(),
@@ -62,19 +61,15 @@ function firstError(error: z.ZodError, t: Messages): string {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/**
- * El contenedor tiene que ser del mismo usuario: un uuid ajeno no sirve para guardar cosas ahí.
- * Devuelve el estante válido dentro del contenedor (sin contenedor, siempre el 0).
- */
-async function resolveLevel(userId: string, shelfId: string | null, level: number, t: Messages, conn: Tx | typeof db = db): Promise<number> {
-  if (!shelfId) return 0;
+/** El contenedor tiene que ser del mismo usuario: un uuid ajeno no sirve para guardar cosas ahí. */
+async function checkContainer(userId: string, shelfId: string | null, t: Messages, conn: Tx | typeof db = db): Promise<void> {
+  if (!shelfId) return;
   const [row] = await conn
-    .select({ levels: shelves.levels })
+    .select({ id: shelves.id })
     .from(shelves)
     .where(and(eq(shelves.id, shelfId), eq(shelves.userId, userId)))
     .limit(1);
   if (!row) throw new Error(t.errors.containerMissing);
-  return Math.min(Math.max(0, level), row.levels - 1);
 }
 
 function toValues(data: z.output<typeof itemSchema>) {
@@ -133,6 +128,18 @@ function topPosition(userId: string) {
   return sql<number>`(select coalesce(min(${items.position}), 0) - 1 from ${items} where ${items.userId} = ${userId})`;
 }
 
+function bottomPosition(userId: string) {
+  return sql<number>`(select coalesce(max(${items.position}), 0) + 1 from ${items} where ${items.userId} = ${userId})`;
+}
+
+/**
+ * Dónde entra en el orden algo que llega a un lugar: sin ubicar, primero (es lo que se acaba de
+ * cargar y está a mano); en un mueble, al final, que es el último estante con lugar (o uno nuevo).
+ */
+function arrivalPosition(userId: string, shelfId: string | null) {
+  return shelfId ? bottomPosition(userId) : topPosition(userId);
+}
+
 async function guard<T>(t: Messages, fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, data: await fn() };
@@ -150,7 +157,7 @@ export async function createItem(input: ItemInput): Promise<ActionResult<{ id: s
     // TMDB se consulta antes de abrir la transacción: no tiene sentido tenerla abierta esperando la red.
     const translations = await buildTranslations(values, locale, null);
     const row = await db.transaction(async (tx) => {
-      const level = await resolveLevel(userId, parsed.data.shelfId, parsed.data.level, t, tx);
+      await checkContainer(userId, parsed.data.shelfId, t, tx);
       // El número sale de un contador del usuario, no de max()+1: borrar el último no lo libera.
       const [seq] = await tx
         .update(users)
@@ -160,7 +167,7 @@ export async function createItem(input: ItemInput): Promise<ActionResult<{ id: s
       if (!seq) throw new Error(t.errors.unauthenticated);
       const [created] = await tx
         .insert(items)
-        .values({ ...values, translations, level, userId, position: topPosition(userId), inventoryNumber: seq.n })
+        .values({ ...values, translations, level: 0, userId, position: arrivalPosition(userId, parsed.data.shelfId), inventoryNumber: seq.n })
         .returning({ id: items.id, inventoryNumber: items.inventoryNumber });
       return created;
     });
@@ -175,7 +182,7 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
   if (!parsed.success) return { ok: false, error: firstError(parsed.error, t) };
   return guard(t, async () => {
     const [current] = await db
-      .select({ externalId: items.externalId, attributes: items.attributes, translations: items.translations })
+      .select({ externalId: items.externalId, attributes: items.attributes, translations: items.translations, shelfId: items.shelfId })
       .from(items)
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .limit(1);
@@ -186,10 +193,12 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
       season: current.attributes.season,
       translations: current.translations,
     });
-    const level = await resolveLevel(userId, parsed.data.shelfId, parsed.data.level, t);
+    await checkContainer(userId, parsed.data.shelfId, t);
+    // Si cambió de lugar, llega como cualquier cosa que llega ahí; si no, conserva su lugar.
+    const moved = current.shelfId !== parsed.data.shelfId;
     const updated = await db
       .update(items)
-      .set({ ...values, translations, level, updatedAt: new Date() })
+      .set({ ...values, translations, level: 0, ...(moved ? { position: arrivalPosition(userId, parsed.data.shelfId) } : {}), updatedAt: new Date() })
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .returning({ id: items.id });
     if (!updated.length) throw new Error(t.errors.itemMissing);
@@ -247,27 +256,33 @@ export async function completeTranslations(): Promise<ActionResult<{ done: numbe
   });
 }
 
-/** Arrastrar un objeto a un contenedor (o a "Sin ubicar"): queda primero en su estante de arriba. */
+/**
+ * Arrastrar un objeto a un contenedor (o a "Sin ubicar"): a un mueble llega al final, que es el
+ * último estante con lugar; a "Sin ubicar", primero.
+ */
 export async function moveItem(id: string, shelfId: string | null): Promise<ActionResult> {
-  return placeItem(id, shelfId, 0, 0);
+  return placeItem(id, shelfId, shelfId ? MAX_INDEX : 0);
 }
 
+const MAX_INDEX = 5000;
+
 /**
- * Soltar un objeto en un lugar concreto: contenedor, estante (`level`) y posición dentro del
- * estante contada desde la izquierda (`index`). Es lo que hace la vista 3D al soltar un lomo.
+ * Soltar un objeto en un lugar concreto: contenedor y lugar dentro de lo que tiene, contado en
+ * orden (estante de arriba de izquierda a derecha, después el siguiente). El estante no se guarda:
+ * sale de ese orden (`flowShelves`). Es lo que hace la vista 3D al soltar un lomo.
  *
  * El orden se guarda con el mismo criterio que `reorderItems`: se toman las posiciones que ya
- * ocupaban los objetos de ese estante (más la del que llega) y se reparten en el orden nuevo.
+ * ocupaban los objetos del contenedor (más la del que llega) y se reparten en el orden nuevo.
  */
-export async function placeItem(id: string, shelfId: string | null, level: number, index: number): Promise<ActionResult> {
+export async function placeItem(id: string, shelfId: string | null, index: number): Promise<ActionResult> {
   const { userId, t } = await session();
   const args = z
-    .object({ id: z.uuid(), shelfId: z.uuid().nullable(), level: z.number().int().min(0).max(20), index: z.number().int().min(0).max(5000) })
-    .safeParse({ id, shelfId, level, index });
+    .object({ id: z.uuid(), shelfId: z.uuid().nullable(), index: z.number().int().min(0).max(MAX_INDEX) })
+    .safeParse({ id, shelfId, index });
   if (!args.success) return { ok: false, error: t.errors.badPlace };
   return guard(t, async () => {
     await db.transaction(async (tx) => {
-      const target = await resolveLevel(userId, args.data.shelfId, args.data.level, t, tx);
+      await checkContainer(userId, args.data.shelfId, t, tx);
       const [moving] = await tx
         .select({ id: items.id, position: items.position })
         .from(items)
@@ -282,7 +297,6 @@ export async function placeItem(id: string, shelfId: string | null, level: numbe
           and(
             eq(items.userId, userId),
             args.data.shelfId ? eq(items.shelfId, args.data.shelfId) : isNull(items.shelfId),
-            eq(items.level, target),
             ne(items.id, moving.id),
           ),
         )
@@ -299,7 +313,7 @@ export async function placeItem(id: string, shelfId: string | null, level: numbe
         if (itemId === moving.id) {
           await tx
             .update(items)
-            .set({ shelfId: args.data.shelfId, level: target, position: slots[i], updatedAt: new Date() })
+            .set({ shelfId: args.data.shelfId, level: 0, position: slots[i], updatedAt: new Date() })
             .where(eq(items.id, itemId));
         } else if (current.get(itemId) !== slots[i]) {
           await tx.update(items).set({ position: slots[i] }).where(eq(items.id, itemId));

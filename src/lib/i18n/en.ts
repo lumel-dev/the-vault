@@ -97,7 +97,6 @@ const en: Messages = {
   },
   toast: {
     moved: (item: string, place: string) => `${item} → ${place}`,
-    level: (n: number) => `shelf ${n}`,
     arranged: (container: string, by: string) => `${container} is now sorted by ${by}`,
     leaving: (name: string) => `${name} leaves the vault`,
     undo: "Undo",
@@ -141,9 +140,6 @@ const en: Messages = {
   form: {
     type: "Type",
     where: "Where it is",
-    level: "Shelf",
-    levelTop: (n: number) => `${n} (top)`,
-    levelBottom: (n: number) => `${n} (bottom)`,
     name: "Name",
     description: "Description",
     removeCover: "Remove cover",
@@ -172,9 +168,6 @@ const en: Messages = {
     what: "What it is",
     name: "Name",
     namePlaceholder: "Living room, Box 3, TV cabinet",
-    levels: "Shelves",
-    lessLevels: "One shelf less",
-    moreLevels: "One more shelf",
     delete: "Delete container",
     confirmDelete: "Sure? Delete",
     kinds: {

@@ -36,8 +36,6 @@ export const shelves = pgTable(
     // "cabinet" (mueble con puertas). Ver `src/lib/containers.ts`.
     kind: text("kind").notNull().default("shelf"),
     // Cuántos estantes tiene (en una caja, siempre 1).
-    // Sin uso desde los estantes automáticos (`flowShelves`): se borra en la migración siguiente.
-    levels: integer("levels").notNull().default(3),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -109,8 +107,6 @@ export const items = pgTable(
     externalSource: text("external_source"),
     externalId: text("external_id"),
     // En qué estante del contenedor está (0 = el de arriba).
-    // Sin uso desde los estantes automáticos: se borra en la migración siguiente.
-    level: integer("level").notNull().default(0),
     // Orden manual de toda la colección del usuario. Ver `reorderItems`.
     position: integer("position").notNull().default(0),
     // Número de inventario correlativo por usuario (N.º 0142), el que va escrito en el lomo.

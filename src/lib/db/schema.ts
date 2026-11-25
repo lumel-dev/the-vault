@@ -43,6 +43,29 @@ export const shelves = pgTable(
   (t) => [uniqueIndex("shelves_user_name_idx").on(t.userId, t.name)],
 );
 
+/**
+ * Un sticker: la etiqueta de color que lleva cada objeto (Películas, Series, Anime…). Cada usuario
+ * tiene los suyos; arrancan siendo los seis de siempre. `base` es qué clase de objeto es (uno de
+ * `ITEM_TYPES`) y decide el catálogo, los campos y la forma en el 3D. Ver `src/lib/stickers.ts`.
+ */
+export const stickers = pgTable(
+  "stickers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    base: text("base").notNull(),
+    // Sin nombre = el nombre de su tipo en el idioma del usuario ("Películas" / "Movies").
+    name: text("name"),
+    // Hex, "#e2412f".
+    color: text("color").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stickers_user_idx").on(t.userId, t.position)],
+);
+
 /** Los datos propios de cada tipo (temporada, formato, autor…). Ver `src/lib/item-types.ts`. */
 export type ItemAttributes = Record<string, string>;
 
@@ -68,7 +91,10 @@ export const items = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     // Sin estante = "Sin ubicar". Borrar un estante no borra lo que tenía.
     shelfId: uuid("shelf_id").references(() => shelves.id, { onDelete: "set null" }),
+    // La clase de objeto (`ITEM_TYPES`): siempre la `base` de su sticker.
     type: text("type").notNull(),
+    // Su sticker. Nulo sólo en datos de antes de los stickers propios (la migración 0005 los completa).
+    stickerId: uuid("sticker_id").references(() => stickers.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     description: text("description"),
     brand: text("brand"),
@@ -105,3 +131,4 @@ export const items = pgTable(
 export type User = typeof users.$inferSelect;
 export type Shelf = typeof shelves.$inferSelect;
 export type Item = typeof items.$inferSelect;
+export type StickerRow = typeof stickers.$inferSelect;

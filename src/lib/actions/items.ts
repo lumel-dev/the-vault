@@ -6,10 +6,11 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/auth/session";
 import { isValidCover } from "@/lib/covers";
 import { db } from "@/lib/db";
-import { items, shelves, users, type ItemTranslations } from "@/lib/db/schema";
+import { items, shelves, stickers, users, type ItemTranslations } from "@/lib/db/schema";
 import { messages, type Messages } from "@/lib/i18n";
 import { getUserLocale } from "@/lib/i18n/server";
 import { cleanAttributes, isItemType } from "@/lib/item-types";
+import { ensureStickers } from "@/lib/queries";
 import { siblingIndex } from "@/lib/siblings";
 import { tmdbEnabled, tmdbTranslations } from "@/lib/tmdb";
 
@@ -37,6 +38,8 @@ const itemSchema = z.object({
   brand: optionalText(120),
   model: optionalText(120),
   shelfId: z.uuid().nullish().transform((v) => v ?? null),
+  // El sticker manda: el tipo del objeto es su `base`. Sin sticker, el primero del tipo.
+  stickerId: z.uuid().nullish(),
   attributes: z.record(z.string(), z.unknown()).default({}),
   coverSource: z.string().nullish(),
   coverRef: z.string().nullish(),
@@ -61,6 +64,31 @@ function firstError(error: z.ZodError, t: Messages): string {
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * El sticker del objeto, que tiene que ser del mismo usuario. Sin sticker (o con uno que ya no
+ * existe) se usa el primero del tipo pedido; si el usuario no tiene ninguno de ese tipo, falla.
+ */
+async function resolveSticker(userId: string, stickerId: string | null | undefined, type: string, t: Messages): Promise<{ id: string; base: string }> {
+  if (stickerId) {
+    const [own] = await db
+      .select({ id: stickers.id, base: stickers.base })
+      .from(stickers)
+      .where(and(eq(stickers.id, stickerId), eq(stickers.userId, userId)))
+      .limit(1);
+    if (!own) throw new Error(t.errors.stickerMissing);
+    return own;
+  }
+  await ensureStickers(userId);
+  const [first] = await db
+    .select({ id: stickers.id, base: stickers.base })
+    .from(stickers)
+    .where(and(eq(stickers.userId, userId), eq(stickers.base, type)))
+    .orderBy(asc(stickers.position), asc(stickers.createdAt))
+    .limit(1);
+  if (!first) throw new Error(t.errors.stickerMissing);
+  return first;
+}
 
 /** El contenedor tiene que ser del mismo usuario: un uuid ajeno no sirve para guardar cosas ahí. */
 async function checkContainer(userId: string, shelfId: string | null, t: Messages, conn: Tx | typeof db = db): Promise<void> {
@@ -154,7 +182,8 @@ export async function createItem(input: ItemInput): Promise<ActionResult<{ id: s
   const parsed = itemSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error, t) };
   return guard(t, async () => {
-    const values = toValues(parsed.data);
+    const sticker = await resolveSticker(userId, parsed.data.stickerId, parsed.data.type, t);
+    const values = { ...toValues({ ...parsed.data, type: sticker.base as typeof parsed.data.type }), stickerId: sticker.id };
     // TMDB se consulta antes de abrir la transacción: no tiene sentido tenerla abierta esperando la red.
     const translations = await buildTranslations(values, locale, null);
     const row = await db.transaction(async (tx) => {
@@ -189,7 +218,8 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .limit(1);
     if (!current) throw new Error(t.errors.itemMissing);
-    const values = toValues(parsed.data);
+    const sticker = await resolveSticker(userId, parsed.data.stickerId, parsed.data.type, t);
+    const values = { ...toValues({ ...parsed.data, type: sticker.base as typeof parsed.data.type }), stickerId: sticker.id };
     const translations = await buildTranslations(values, locale, {
       externalId: current.externalId,
       season: current.attributes.season,

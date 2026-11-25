@@ -10,6 +10,7 @@ import type { Whereabouts } from "@/lib/where";
 import { Cover } from "./Cover";
 import { SeasonsCheck } from "./SeasonsCheck";
 import { Sticker } from "./Sticker";
+import { useStickers } from "./StickersContext";
 
 interface Props {
   item: VaultItem;
@@ -32,6 +33,7 @@ export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }
   );
   const def = typeDef(item.type);
   const { t } = useI18n();
+  const sticker = useStickers().of(item);
   const facts: [string, string][] = [];
   if (def.brandModel) {
     if (item.brand) facts.push([t.panel.brand, item.brand]);
@@ -48,15 +50,15 @@ export function ItemPanel({ item, collection, where, onClose, onEdit, onDelete }
       className="pointer-events-auto max-h-[min(70dvh,44rem)] w-full overflow-y-auto rounded-t-xl bg-card p-5 shadow-[0_-8px_30px_-10px_rgb(28_27_25/45%)] md:w-80 md:rounded-xl md:shadow-[0_18px_40px_-16px_rgb(28_27_25/55%)]"
     >
       <div className="flex items-start gap-4">
-        <Cover type={item.type} name={item.name} coverSource={item.coverSource} coverRef={item.coverRef} size="sm" className="w-20 shrink-0 shadow-[0_6px_14px_-6px_rgb(28_27_25/60%)]" />
+        <Cover type={item.type} stickerColor={sticker.color} name={item.name} coverSource={item.coverSource} coverRef={item.coverRef} size="sm" className="w-20 shrink-0 shadow-[0_6px_14px_-6px_rgb(28_27_25/60%)]" />
         <div className="min-w-0 flex-1">
           <h2 className="text-lg leading-tight font-bold text-balance">
             {item.name}
             {item.type === "series" && item.attributes.season ? ` · ${t.seasonShort(item.attributes.season)}` : ""}
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Sticker type={item.type} className="size-2.5" />
-            {t.types[item.type as keyof typeof t.types]?.label ?? item.type} · <span className="tabular-nums">{inventoryLabel(item.inventoryNumber, t)}</span>
+            <Sticker color={sticker.color} className="size-2.5" />
+            {sticker.label} · <span className="tabular-nums">{inventoryLabel(item.inventoryNumber, t)}</span>
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label={t.common.close} className="-mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">

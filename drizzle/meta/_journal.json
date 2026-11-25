@@ -36,6 +36,13 @@
       "when": 1795627500457,
       "tag": "0004_estantes_automaticos",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795628966923,
+      "tag": "0005_stickers",
+      "breakpoints": true
     }
   ]
 }

@@ -2,12 +2,12 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { Layers, Pencil, Plus } from "lucide-react";
-import { ITEM_TYPE_KEYS } from "@/lib/item-types";
 import type { VaultShelf } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { ContainerIcon } from "./ContainerIcon";
 import { Sticker } from "./Sticker";
+import { useStickers, type StickerWithCount } from "./StickersContext";
 
 export const DROP_PREFIX = "shelf:";
 
@@ -22,8 +22,11 @@ interface Props {
   onPick: (shelf: string) => void;
   onEdit: (shelf: VaultShelf) => void;
   onCreate: () => void;
+  /** El sticker por el que se filtra (su id) o "all". */
   type: string;
   onType: (type: string) => void;
+  onEditSticker: (sticker: StickerWithCount) => void;
+  onCreateSticker: () => void;
 }
 
 function Row({
@@ -93,8 +96,9 @@ function Row({
  * Los contenedores de la casa: elegirlos lleva la cámara (o filtra la grilla), y en la grilla
  * reciben lo que se suelta encima. En el celular es una fila que se desliza.
  */
-export function ContainerRail({ shelves, unshelved, total, current, hits, dragging, onPick, onEdit, onCreate, type, onType }: Props) {
+export function ContainerRail({ shelves, unshelved, total, current, hits, dragging, onPick, onEdit, onCreate, type, onType, onEditSticker, onCreateSticker }: Props) {
   const { t } = useI18n();
+  const { stickers, label } = useStickers();
   return (
     <nav aria-label="Contenedores" className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <div>
@@ -155,26 +159,51 @@ export function ContainerRail({ shelves, unshelved, total, current, hits, draggi
       <div>
         <h2 className="mb-1.5 hidden px-2.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase md:block">{t.rail.stickers}</h2>
         <ul className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:flex-col md:gap-0 md:px-0" aria-label={t.rail.filterByType}>
-          {ITEM_TYPE_KEYS.map((k) => {
-            const active = type === k;
+          {stickers.map((s) => {
+            const active = type === s.id;
+            const name = label(s);
             return (
-              <li key={k} className="shrink-0">
+              <li key={s.id} className="group/row relative flex shrink-0 items-center">
                 <button
                   type="button"
-                  onClick={() => onType(active ? "all" : k)}
+                  onClick={() => onType(active ? "all" : s.id)}
                   aria-pressed={active}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors md:py-1",
+                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors md:py-1 md:pr-9",
                     active ? "bg-card font-semibold" : "text-foreground/75 hover:text-foreground",
                     "max-md:rounded-full max-md:border max-md:border-border max-md:px-3",
+                    active && "max-md:pr-9",
                   )}
                 >
-                  <Sticker type={k} />
-                  {t.types[k].plural}
+                  <Sticker color={s.color} />
+                  <span className="truncate">{name}</span>
+                  <span className="ml-auto hidden pl-2 text-xs text-muted-foreground tabular-nums md:inline">{s.count}</span>
+                </button>
+                {/* En el celular el lápiz aparece en el sticker elegido; en la compu, al pasar. */}
+                <button
+                  type="button"
+                  onClick={() => onEditSticker(s)}
+                  aria-label={t.rail.editSticker(name)}
+                  className={cn(
+                    "absolute top-1/2 right-1.5 size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground transition hover:bg-background hover:text-foreground",
+                    active ? "grid md:opacity-0 md:group-hover/row:opacity-100" : "hidden md:grid md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100",
+                  )}
+                >
+                  <Pencil className="size-3.5" />
                 </button>
               </li>
             );
           })}
+          <li className="shrink-0 md:mt-1">
+            <button
+              type="button"
+              onClick={onCreateSticker}
+              className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground md:py-1"
+            >
+              <Plus className="size-4" strokeWidth={1.75} />
+              {t.rail.newSticker}
+            </button>
+          </li>
         </ul>
       </div>
     </nav>

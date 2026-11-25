@@ -191,6 +191,8 @@ export interface SpineSpec {
   id: string;
   name: string;
   type: string;
+  /** El color del sticker del objeto (los stickers son de cada usuario). */
+  stickerColor?: string;
   shape: Shape;
   dims: Dims;
   inventoryNumber: number;
@@ -255,7 +257,7 @@ export function buildSpineAtlas(specs: SpineSpec[]): SpineAtlas {
     } else {
       // Sticker circular del tipo, arriba.
       const r = Math.min(faceW * 0.32, 4.2);
-      ctx.fillStyle = STICKER[spec.type] ?? STICKER.other;
+      ctx.fillStyle = spec.stickerColor ?? STICKER[spec.type] ?? STICKER.other;
       ctx.beginPath();
       ctx.arc(faceW / 2, 6 + r, r, 0, Math.PI * 2);
       ctx.fill();

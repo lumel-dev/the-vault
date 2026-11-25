@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildLayout, CORNER, dropTarget, frontNormal, itemShape, toLocal, toWorld } from "@/lib/scene-layout";
+import { buildLayout, CORNER, dropTarget, flowShelves, frontNormal, itemShape, toLocal, toWorld } from "@/lib/scene-layout";
 import { matcher, search, wordSimilarity, type Searchable } from "@/lib/search";
 import { messages } from "@/lib/i18n";
 import { whereabouts, whereLabel } from "@/lib/where";
@@ -72,19 +72,26 @@ describe("medidas reales", () => {
 
 describe("armado de la escena", () => {
   const containers = [
-    { id: "living", name: "Living", kind: "shelf", levels: 2 },
-    { id: "caja", name: "Caja 3", kind: "box", levels: 1 },
+    { id: "living", name: "Living", kind: "shelf" },
+    { id: "caja", name: "Caja 3", kind: "box" },
   ];
-  const item = (id: string, shelfId: string | null, level = 0) => ({ id, shelfId, level, type: "movie", name: id, attributes: { format: "DVD" } });
-  const items = [item("a", "living"), item("b", "living"), item("c", "living", 1), item("d", "caja"), item("e", null), item("f", "otro-usuario")];
+  const item = (id: string, shelfId: string | null) => ({ id, shelfId, type: "movie", name: id, attributes: { format: "DVD" } });
+  // 50 DVDs de 14 mm en una estantería de 80 cm: entran 45 por estante, el resto pasa al segundo.
+  const many = Array.from({ length: 48 }, (_, i) => item(`x${i}`, "living"));
+  const items = [item("a", "living"), item("b", "living"), ...many, item("d", "caja"), item("e", null), item("f", "otro-usuario")];
   const layout = buildLayout(containers, items);
 
-  it("pone cada objeto en su contenedor, estante y lugar", () => {
+  it("reparte lo del mueble en estantes de 80 cm, en orden, y suma los que hagan falta", () => {
     const byId = new Map(layout.items.map((p) => [p.id, p]));
     assert.equal(byId.get("a")!.index, 0);
     assert.equal(byId.get("b")!.index, 1);
-    assert.equal(byId.get("c")!.level, 1);
-    assert.ok(byId.get("a")!.position[1] > byId.get("c")!.position[1], "el estante 1 está arriba del 2");
+    assert.equal(byId.get("x0")!.level, 0);
+    assert.equal(byId.get("x47")!.level, 1, "lo que no entra pasa al estante de abajo");
+    assert.ok(byId.get("a")!.position[1] > byId.get("x47")!.position[1], "el estante 1 está arriba del 2");
+    const living = layout.containers.find((c) => c.id === "living")!;
+    assert.equal(living.width, 0.8);
+    assert.equal(living.levelFloors.length, 2);
+    assert.equal(flowShelves([]).length, 1, "vacío tiene un estante");
     assert.equal(byId.get("d")!.upright, false, "en una caja, lomo arriba");
     // Un contenedor que no existe se trata como sin ubicar.
     assert.equal(byId.get("f")!.containerId, null);
@@ -101,17 +108,17 @@ describe("armado de la escena", () => {
     const slot = layout.slots.find((s) => s.containerId === "living" && s.level === 0)!;
     const between = slot.edges[1];
     assert.equal(dropTarget(layout, between - 0.001, slot.floor + 0.1)!.index, 1);
-    assert.equal(dropTarget(layout, slot.x1 - 0.01, slot.floor + 0.1)!.index, 2);
+    assert.equal(dropTarget(layout, slot.x1 - 0.01, slot.floor + 0.1)!.index, slot.edges.length - 1, "al final del estante");
     assert.equal(dropTarget(layout, -5, 0.5), null);
   });
 });
 
 describe("habitación en L", () => {
   const four = [
-    { id: "a", name: "A", kind: "shelf", levels: 3 },
-    { id: "b", name: "B", kind: "box", levels: 1 },
-    { id: "c", name: "C", kind: "cabinet", levels: 2 },
-    { id: "d", name: "D", kind: "box", levels: 1 },
+    { id: "a", name: "A", kind: "shelf" },
+    { id: "b", name: "B", kind: "box" },
+    { id: "c", name: "C", kind: "cabinet" },
+    { id: "d", name: "D", kind: "box" },
   ];
   const layout = buildLayout(four, []);
   const byId = new Map(layout.containers.map((c) => [c.id, c]));
@@ -162,18 +169,22 @@ describe("habitación en L", () => {
 });
 
 describe("dónde está", () => {
-  const shelves = [{ id: "living", name: "Living", kind: "shelf", levels: 3 }, { id: "caja", name: "Caja 3", kind: "box", levels: 1 }];
+  const shelves = [{ id: "living", name: "Living", kind: "shelf" }, { id: "caja", name: "Caja 3", kind: "box" }];
+  const dvd = (id: string, shelfId: string | null) => ({ id, shelfId, type: "movie", name: id, attributes: { format: "DVD" } });
   const ordered = [
-    { id: "a", shelfId: "caja", level: 0 },
-    { id: "b", shelfId: "living", level: 1 },
-    { id: "c", shelfId: "caja", level: 0 },
-    { id: "d", shelfId: null, level: 0 },
+    dvd("a", "caja"),
+    // 46 en el living: el último ya no entra en el primer estante.
+    ...Array.from({ length: 46 }, (_, i) => dvd(`l${i}`, "living")),
+    dvd("c", "caja"),
+    dvd("d", null),
   ];
+  const byId = (id: string) => ordered.find((i) => i.id === id)!;
 
   it("lo dice como en la casa", () => {
-    assert.equal(whereLabel(whereabouts(ordered[2], ordered, shelves, messages.es)), "Caja 3 · 2.º lugar");
-    assert.equal(whereLabel(whereabouts(ordered[1], ordered, shelves, messages.es)), "Living · Estante 2 · 1.º lugar");
-    assert.equal(whereLabel(whereabouts(ordered[1], ordered, shelves, messages.en)), "Living · Shelf 2 · spot 1");
-    assert.equal(whereLabel(whereabouts(ordered[3], ordered, shelves, messages.es)), "Sin ubicar · 1.º lugar");
+    assert.equal(whereLabel(whereabouts(byId("c"), ordered, shelves, messages.es)), "Caja 3 · 2.º lugar");
+    assert.equal(whereLabel(whereabouts(byId("l45"), ordered, shelves, messages.es)), "Living · Estante 2 · 1.º lugar");
+    assert.equal(whereLabel(whereabouts(byId("l45"), ordered, shelves, messages.en)), "Living · Shelf 2 · spot 1");
+    assert.equal(whereLabel(whereabouts(byId("l3"), ordered, shelves, messages.es)), "Living · Estante 1 · 4.º lugar");
+    assert.equal(whereLabel(whereabouts(byId("d"), ordered, shelves, messages.es)), "Sin ubicar · 1.º lugar");
   });
 });

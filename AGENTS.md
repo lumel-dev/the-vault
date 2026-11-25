@@ -55,13 +55,17 @@ contrato; uno que lo cambia, lo actualiza.
 ## Datos
 
 - **Todo se filtra por `userId` de la sesión** (`requireUserId()` en `src/lib/auth/session.ts`).
-  Nunca se confía en un id de usuario ni de contenedor que mande el browser: `resolveLevel` en
-  `src/lib/actions/items.ts` verifica que el contenedor sea del mismo usuario y ajusta el estante
-  a los que tiene.
-- **Contenedores** (`shelves`): `kind` es `shelf`, `box` o `cabinet` (`src/lib/containers.ts`) y
-  `levels` cuántos estantes tiene (una caja, 1). Cada objeto tiene `level` (0 = arriba). Bajar
-  `levels` mueve lo de los estantes que desaparecen al último; borrar un contenedor deja todo sin
-  ubicar en el nivel 0.
+  Nunca se confía en un id de usuario ni de contenedor que mande el browser: `checkContainer` en
+  `src/lib/actions/items.ts` verifica que el contenedor sea del mismo usuario.
+- **Contenedores** (`shelves`): `kind` es `shelf`, `box` o `cabinet` (`src/lib/containers.ts`).
+  Borrar un contenedor deja todo sin ubicar.
+- **Los estantes no se guardan, se calculan.** Estanterías y muebles miden 80 cm
+  (`FURNITURE_WIDTH`) y `flowShelves` (`src/lib/scene-layout.ts`) reparte lo de cada uno, en el
+  orden de `position`, como un texto en renglones: se llena el estante de arriba y lo que no entra
+  pasa al siguiente. La escena, `whereabouts` ("Estante 2 · 3.º lugar") y `VaultApp.place` usan la
+  misma función. Las columnas `shelves.levels` e `items.level` quedaron de antes (la migración
+  `0004` reordenó lo que había por estante y puso `level` en 0) y no se leen; se pueden borrar en
+  un cambio aparte (*contract*).
 - **Número de inventario**: sale de `users.inventory_seq` (un contador), no de `max()+1`, para que
   borrar el último no lo libere. Único por usuario.
 - **`items` es una sola tabla para todos los tipos.** Lo propio de cada tipo va en `attributes`
@@ -95,9 +99,12 @@ SQL; hoy no la usa la app.
 
 ## Orden y arrastre
 
-- `items.position` es un orden **global por usuario**. Cada estante muestra sus objetos en ese
-  orden. Lo nuevo queda primero (`min(position) - 1`).
-- `reorderItems(ids)` y `placeItem(id, contenedor, estante, lugar)` **reparten entre los objetos
+- `items.position` es un orden **global por usuario**. Cada contenedor muestra sus objetos en ese
+  orden (y de ahí salen sus estantes). Lo que llega a un mueble, nuevo o movido, va al final
+  (`max(position) + 1`, el último estante con lugar); lo que queda sin ubicar, primero
+  (`min(position) - 1`). Excepción: si en ese mueble ya están sus hermanas (mismo `external_id`,
+  otras temporadas), `besideSiblings` lo pone al lado, en orden de temporada (`src/lib/siblings.ts`).
+- `reorderItems(ids)` y `placeItem(id, contenedor, lugar)` **reparten entre los objetos
   tocados las posiciones que ya ocupaban**: lo que no se ve no se mueve. Está cubierto por tests
   de integración; si cambia el modelo de orden, esos tests son el contrato.
 - "Acomodar así" (vista Mueble) aplica un orden (`sortItems`) a un contenedor con `reorderItems`:
@@ -142,7 +149,8 @@ SQL; hoy no la usa la app.
 - Arrastre 3D: con mouse arranca a los 6 px; con el dedo, a los 250 ms sin moverse (si no,
   deslizar mueve la cámara). Como los muebles miran a dos paredes, el rayo del puntero se prueba
   contra el frente de cada estante en las coordenadas de su mueble y gana el más cercano. Soltar a
-  menos de 12 px de donde se agarró no mueve nada. Dentro del mismo estante, el lugar se cuenta sin
+  menos de 12 px de donde se agarró no mueve nada. El 3D manda estante y lugar en el estante;
+  `VaultApp.place` los pasa a lugar dentro del mueble para `placeItem`. Dentro del mismo estante, el lugar se cuenta sin
   el objeto que se mueve.
 - Lo elegido nunca se apaga por la búsqueda (si no, su tapa quedaba casi invisible).
 - El 3D no es accesible por teclado: todo lo que hace tiene equivalente en la grilla.

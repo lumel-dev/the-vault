@@ -239,7 +239,7 @@ En el celular la barra se vuelve dos filas (logo y salir; búsqueda a todo el an
 
 La grilla tiene cuatro densidades: **Tapas** (`auto-fill` de columnas de 7.5rem como mínimo, 9rem desde `sm`, 16px entre columnas y 20px entre filas), **Chicas** (4.25rem / 5.25rem, sólo el nombre en una línea), **Lista** (filas con tapa de 2rem, dos columnas desde `md`) y **Lomos** (cada objeto parado sobre una tabla de madera de 6px, con el alto real a escala y el ancho exagerado para que entre el título, de abajo hacia arriba como en el 3D). Las tapas mantienen la proporción 2:3 de una caja de DVD. En "Toda la casa" cada contenedor es una sección con su nombre en cinta. El ritmo general es de 4px: 8, 10, 16 y 20 son los pasos que se repiten.
 
-**La Regla de la Escala Real.** En el 3D cada objeto mide lo que mide (DVD 14 mm de lomo, libros con grosor y alto propios, estantes de 32 cm de profundidad, cajas de 10,5 cm de pared). Los muebles se dimensionan por lo que contienen, nunca al revés.
+**La Regla de la Escala Real.** En el 3D cada objeto mide lo que mide (DVD 14 mm de lomo, libros con grosor y alto propios, estantes de 32 cm de profundidad, cajas de 10,5 cm de pared). Las estanterías y los muebles miden 80 cm de ancho, como uno real, y crecen hacia arriba: tienen los estantes que hagan falta para lo que guardan. Las cajas se dimensionan por lo que contienen.
 
 ## Elevation & Depth
 

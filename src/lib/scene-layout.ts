@@ -13,13 +13,11 @@ export interface LayoutContainer {
   id: string;
   name: string;
   kind: string;
-  levels: number;
 }
 
 export interface LayoutItem {
   id: string;
   shelfId: string | null;
-  level: number;
   type: string;
   name: string;
   attributes: Record<string, string>;
@@ -166,6 +164,33 @@ function row(dims: Dims[], x0: number): { centers: number[]; edges: number[]; le
   return { centers, edges, length: x - x0 };
 }
 
+/** Ancho de una estantería o un mueble con puertas, por fuera: todos miden 80 cm. */
+export const FURNITURE_WIDTH = 0.8;
+/** Lo que entra en fila en cada estante (sin los laterales ni el aire de las puntas). */
+const SHELF_ROOM = FURNITURE_WIDTH - 2 * SIDE - 2 * MARGIN;
+
+/**
+ * Reparte lo de un mueble en estantes, en el orden dado, como un texto en renglones: se llena el
+ * de arriba (0) y lo que no entra pasa al siguiente. El mueble tiene los estantes que hagan falta,
+ * y como mínimo uno. Nadie elige el estante: sale del orden y de lo que mide cada cosa.
+ */
+export function flowShelves<T extends Pick<LayoutItem, "type" | "name" | "attributes">>(ordered: T[]): T[][] {
+  const levels: T[][] = [[]];
+  let used = 0;
+  for (const item of ordered) {
+    const t = itemShape(item).dims.t + BETWEEN;
+    const current = levels[levels.length - 1];
+    if (current.length && used + t > SHELF_ROOM) {
+      levels.push([item]);
+      used = t;
+    } else {
+      current.push(item);
+      used += t;
+    }
+  }
+  return levels;
+}
+
 export function buildLayout(containers: LayoutContainer[], allItems: LayoutItem[]): SceneLayout {
   const byContainer = new Map<string | null, LayoutItem[]>();
   for (const item of allItems) {
@@ -211,14 +236,9 @@ export function buildLayout(containers: LayoutContainer[], allItems: LayoutItem[
       continue;
     }
 
-    const levels = Math.max(1, c.levels);
-    const perLevel: { item: LayoutItem; shape: Shape; dims: Dims }[][] = Array.from({ length: levels }, () => []);
-    for (const item of contents) perLevel[Math.min(Math.max(0, item.level), levels - 1)].push({ item, ...itemShape(item) });
-
-    const longest = Math.max(0, ...perLevel.map((l) => l.reduce((s, x) => s + x.dims.t + BETWEEN, 0)));
-    // Lo justo para lo que tiene y un poco de aire, como un mueble que se llenó con el tiempo.
-    const inner = Math.max(0.42, longest + 2 * MARGIN + 0.08);
-    const width = inner + 2 * SIDE;
+    const perLevel = flowShelves(contents).map((list) => list.map((item) => ({ item, ...itemShape(item) })));
+    const levels = perLevel.length;
+    const width = FURNITURE_WIDTH;
     const tallest = Math.max(0.19, ...contents.map((i) => itemShape(i).dims.h));
     const clear = tallest + 0.06;
     const height = PLINTH + levels * (clear + BOARD) + BOARD;

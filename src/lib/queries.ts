@@ -55,7 +55,6 @@ export async function listShelves(userId: string) {
       id: shelves.id,
       name: shelves.name,
       kind: shelves.kind,
-      levels: shelves.levels,
       position: shelves.position,
       count: sql<number>`coalesce(${counts.n}, 0)`,
     })

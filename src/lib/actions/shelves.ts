@@ -1,10 +1,10 @@
 "use server";
 
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserId } from "@/lib/auth/session";
-import { clampLevels, CONTAINER_KINDS, isContainerKind, type ContainerKind } from "@/lib/containers";
+import { isContainerKind, type ContainerKind } from "@/lib/containers";
 import { db } from "@/lib/db";
 import { items, shelves } from "@/lib/db/schema";
 import { messages, type Messages } from "@/lib/i18n";
@@ -14,7 +14,6 @@ import type { ActionResult } from "./items";
 const shelfSchema = z.object({
   name: z.string().trim().min(1).max(60),
   kind: z.string().refine(isContainerKind).default("shelf"),
-  levels: z.number().int().optional(),
 });
 
 export type ShelfInput = z.input<typeof shelfSchema>;
@@ -32,7 +31,8 @@ function parse(input: ShelfInput, t: Messages) {
     return { error } as const;
   }
   const kind = parsed.data.kind as ContainerKind;
-  return { data: { name: parsed.data.name, kind, levels: clampLevels(kind, parsed.data.levels ?? CONTAINER_KINDS[kind].defaultLevels) } } as const;
+  // `shelves.levels` ya no se usa: los estantes salen de lo que tiene el mueble (`flowShelves`).
+  return { data: { name: parsed.data.name, kind } } as const;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -62,27 +62,20 @@ export async function createShelf(input: ShelfInput): Promise<ActionResult<{ id:
 }
 
 /**
- * Cambia nombre, forma o cantidad de estantes. Si quedan menos estantes, lo que estaba en los que
- * desaparecen baja al último que queda: nada se pierde ni queda en un estante que no existe.
+ * Cambia nombre o forma. Los estantes no se eligen: salen de lo que tiene el mueble
+ * (`flowShelves`), así que cambiar la forma no deja nada en un estante que no existe.
  */
 export async function updateShelf(id: string, input: ShelfInput): Promise<ActionResult> {
   const { userId, t } = await session();
   const parsed = parse(input, t);
   if ("error" in parsed) return { ok: false, error: parsed.error! };
   try {
-    const ok = await db.transaction(async (tx) => {
-      const rows = await tx
-        .update(shelves)
-        .set(parsed.data)
-        .where(and(eq(shelves.id, id), eq(shelves.userId, userId)))
-        .returning({ id: shelves.id });
-      if (!rows.length) return false;
-      await tx
-        .update(items)
-        .set({ level: parsed.data.levels - 1 })
-        .where(and(eq(items.shelfId, id), eq(items.userId, userId), gte(items.level, parsed.data.levels)));
-      return true;
-    });
+    const rows = await db
+      .update(shelves)
+      .set(parsed.data)
+      .where(and(eq(shelves.id, id), eq(shelves.userId, userId)))
+      .returning({ id: shelves.id });
+    const ok = rows.length > 0;
     if (!ok) return { ok: false, error: t.errors.containerMissing };
     revalidatePath("/");
     return { ok: true, data: undefined };

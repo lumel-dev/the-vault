@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { ForgetDevice } from "@/components/pwa/ForgetDevice";
 import { auth } from "@/lib/auth/auth";
 import { getMessages } from "@/lib/i18n/server";
 
@@ -10,6 +11,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-12">
+      <ForgetDevice />
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <Logo className="text-3xl" />

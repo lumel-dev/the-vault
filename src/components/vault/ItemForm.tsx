@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { createItem, updateItem, type ItemInput } from "@/lib/actions/items";
 import { searchCatalogAction } from "@/lib/actions/catalogs";
+import type { ItemInput } from "@/lib/schemas";
+import { useVault } from "./VaultStore";
 import { movieDetailsAction, searchTmdbAction, tvSeasonsAction } from "@/lib/actions/tmdb";
 import type { CatalogResult } from "@/lib/catalogs";
-import { inventoryLabel } from "@/lib/containers";
 import { typeDef, type ItemType } from "@/lib/item-types";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import type { TmdbResult, TmdbSeason } from "@/lib/tmdb";
@@ -66,10 +66,10 @@ export function ItemForm({ item, defaultStickerId, defaultShelfId = null, items 
   const [external, setExternal] = useState<{ source: string; id: string } | null>(
     item?.externalSource && item.externalId ? { source: item.externalSource, id: item.externalId } : null,
   );
-  const [pending, startTransition] = useTransition();
+  const { mutate } = useVault();
 
   const def = typeDef(type);
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   /** Al cargar algo nuevo que ya tiene "hermanos" (otra temporada de la misma serie), va con ellos. */
   function placeLikeSiblings(externalId: string) {
@@ -123,20 +123,18 @@ export function ItemForm({ item, defaultStickerId, defaultShelfId = null, items 
       externalSource: (external?.source as ItemInput["externalSource"]) ?? null,
       externalId: external?.id ?? null,
     };
-    startTransition(async () => {
-      if (item) {
-        const res = await updateItem(item.id, input);
-        if (!res.ok) return void toast.error(res.error);
-        toast.success(t.toast.saved);
-        return onDone();
-      }
-      const res = await createItem(input);
-      if (!res.ok) return void toast.error(res.error);
-      // El número es para escribirlo en el lomo real, como en el de la pantalla.
-      toast.success(t.toast.created(name.trim(), inventoryLabel(res.data.inventoryNumber, t)));
-      if (again) resetForNext();
-      else onDone();
-    });
+    // Se guarda en la cola y se ve al instante; el server lo confirma cuando hay señal.
+    if (item) {
+      if (!mutate({ kind: "updateItem", id: item.id, input, locale })) return;
+      toast.success(t.toast.saved);
+      return onDone();
+    }
+    if (!mutate({ kind: "createItem", id: crypto.randomUUID(), input })) return;
+    // El número para el lomo llega con la confirmación del server (`VaultStore`); sin señal, se avisa
+    // que quedó acá.
+    if (!navigator.onLine) toast.success(t.offline.savedHere(name.trim()));
+    if (again) resetForNext();
+    else onDone();
   }
 
   return (
@@ -278,16 +276,15 @@ export function ItemForm({ item, defaultStickerId, defaultShelfId = null, items 
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
+        <Button type="button" variant="ghost" onClick={onCancel}>
           {t.common.cancel}
         </Button>
         {!editing && (
-          <Button type="submit" name="intent" value="again" variant="outline" disabled={pending || !name.trim()}>
+          <Button type="submit" name="intent" value="again" variant="outline" disabled={!name.trim()}>
             {t.form.addAnother}
           </Button>
         )}
-        <Button type="submit" name="intent" value="done" disabled={pending || !name.trim()} className="sm:min-w-28">
-          {pending && <Loader2 className="animate-spin" />}
+        <Button type="submit" name="intent" value="done" disabled={!name.trim()} className="sm:min-w-28">
           {editing ? t.common.save : t.form.add}
         </Button>
       </div>
@@ -433,6 +430,8 @@ function TmdbPicker({
         </div>
       </div>
 
+      {live.failed && <p className="text-xs text-muted-foreground">{t.offline.search}</p>}
+
       {results && (
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
@@ -546,6 +545,8 @@ function CatalogPicker({
           )}
         </div>
       </div>
+
+      {live.failed && <p className="text-xs text-muted-foreground">{t.offline.search}</p>}
 
       {results && (
         <div>

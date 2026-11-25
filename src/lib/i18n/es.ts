@@ -132,6 +132,15 @@ const es = {
     containerCreated: (name: string) => `"${name}" está en la casa`,
     containerDeleted: (name: string) => `"${name}" ya no está; lo que tenía quedó sin ubicar`,
   },
+  offline: {
+    offline: "Sin conexión",
+    pending: (n: number) => (n === 1 ? "1 cambio por subir" : `${n} cambios por subir`),
+    upToDate: "Todo subido",
+    session: "Entrá de nuevo para subir los cambios",
+    savedHere: (name: string) => `"${name}" quedó guardado acá; se sube cuando vuelva la señal`,
+    search: "Sin conexión: el catálogo no responde. Completá los datos a mano.",
+    page: "Sin conexión. Esta página necesita internet.",
+  },
   panel: {
     aria: (name: string) => `${name}, dónde está`,
     brand: "Marca",

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Permanent_Marker } from "next/font/google";
+import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { Toaster } from "@/components/ui/sonner";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getMessages } from "@/lib/i18n/server";
@@ -14,6 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: { default: "The Vault", template: "%s · The Vault" },
     description: t.meta.description,
+    // Instalada en iOS: pantalla completa, con su ícono (el manifest lo lee Android y escritorio).
+    appleWebApp: { capable: true, title: "The Vault", statusBarStyle: "default" },
+    icons: { apple: "/icons/apple-touch-icon.png" },
   };
 }
 
@@ -29,6 +33,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <I18nProvider locale={locale}>
           {children}
           <Toaster position="bottom-center" />
+          <RegisterServiceWorker />
         </I18nProvider>
       </body>
     </html>

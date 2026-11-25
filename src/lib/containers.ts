@@ -20,6 +20,8 @@ export function isContainerKind(value: unknown): value is ContainerKind {
 }
 
 /** "N.º 0142" / "No. 0142": el número de inventario como va escrito en el lomo. */
+/** El número que va en el lomo. Lo cargado sin señal todavía no tiene: "N.º —" hasta que se sube. */
 export function inventoryLabel(n: number, t: Messages): string {
+  if (n <= 0) return t.inventory("—");
   return t.inventory(String(n).padStart(4, "0"));
 }

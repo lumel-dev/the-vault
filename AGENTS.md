@@ -128,13 +128,51 @@ SQL; hoy no la usa la app.
 - La densidad de la grilla (`covers`, `small`, `list`, `spines`, en `ItemCard.tsx`) es del browser
   (localStorage), como la vista. Los lomos toman ancho y alto de `itemShape` y el color de
   `src/lib/spines.ts`, el mismo módulo que usa el 3D (sin three.js, para no cargarlo en la grilla).
-- `VaultApp` mantiene una copia local de los items para que mover se vea al instante; se pisa con
-  lo que manda el server tras cada action (`revalidatePath("/")`) y vuelve atrás si la action
-  falla.
+- Toda escritura pasa por la cola de cambios (ver "Sin señal"): `useVault().mutate(op)` valida,
+  la aplica al instante sobre la copia del browser y la manda. Nada en la UI llama a las actions
+  de escritura directamente.
 - Grilla: dnd-kit. Los contenedores del riel son droppables con id `shelf:<uuid|none>`.
   `DndContext` lleva `id` fijo: sin él, `aria-describedby` no coincide entre server y cliente.
-- Borrar es diferido: el objeto se tacha y `deleteItem` corre a los 5 segundos si no se deshizo.
+- Borrar es diferido: el objeto se tacha y el `deleteItem` se encola a los 5 segundos si no se deshizo.
   Si se cierra la pestaña antes, no se borra (falla para el lado seguro).
+
+## Sin señal (PWA)
+
+La app abre y se usa sin conexión, y lo hecho sin señal se sube al volver. El modelo es el de las
+pantallas del chofer de erp-base (fase 17.5).
+
+- **La cola es la única forma de escribir**, haya señal o no (`src/lib/offline/`). Un cambio es un
+  `Op` (`ops.ts`): `useVault().mutate(op)` (`VaultStore.tsx`) lo valida con `validateOp`, lo guarda
+  en IndexedDB (`idb.ts`) y lo manda (`sync.ts`) a `/api/sync`, que lo aplica **con las mismas
+  server actions** (`server.ts`). Un solo camino: el modo sin señal no es un caso raro que se
+  prueba poco. Un cambio nuevo es: su `Op`, su caso en `applyOp`/`validateOp`, en `opSchema` y en
+  `run()` de `server.ts`.
+- **Lo que se ve es la última colección del server con la cola aplicada** (`applyOps`, puro y con
+  tests). Hace lo mismo que el server con el orden de la lista, sin tocar `position`, y tiene que
+  ser idempotente: cada cambio se vuelve a aplicar sobre cada colección nueva hasta que esta lo
+  trae. Lo `sent` (confirmado) se borra de la cola cuando llega una colección pedida después.
+- **Lo que se crea lleva el id del browser** (`crypto.randomUUID()`); `createItem`, `createShelf`
+  y `createSticker` lo aceptan y, si ya existe, devuelven el que había (sin gastar otro número de
+  inventario). Borrar algo que ya no está cuenta como hecho. Por eso reenviar es seguro.
+- **`UserError` vs. inesperado** (`src/lib/action-result.ts`): un error para el usuario vuelve
+  con su texto y el cambio se descarta con un toast; cualquier otro vuelve con `retry` y la cola lo
+  reintenta (el lote se corta ahí). Una action nueva tira `UserError` para lo que es del usuario.
+- **Cuándo se manda**: al encolar, al abrir, al volver la señal (`online`), al volver a la pestaña
+  y cada 20 s con cosas pendientes. Una corrida a la vez, también entre pestañas
+  (`navigator.locks`); las otras pestañas se enteran por `BroadcastChannel`. Con algo confirmado,
+  `router.refresh()` trae la colección nueva.
+- **La colección guardada** (IndexedDB, por usuario) y la de la página se comparan por
+  `renderedAt`, la hora del server (`page.tsx`), no la del teléfono. Gana la más nueva.
+- **Service worker** (`public/sw.js`, escrito a mano, sólo en producción): estáticos con hash,
+  tapas ya vistas (sólo CORS, por el 3D) y **la página `/`**, que trae la colección: se guarda sólo
+  si tiene la marca `data-vault-shell`, se sirve sólo sin red (o con 5xx) y se borra al pasar por
+  `/login` o `/registro` (junto con la colección de IndexedDB, `ForgetDevice`). Lo pendiente se
+  conserva: lleva `userId` y `/api/sync` no lo aplica con otra sesión. Nunca cachea pedidos RSC,
+  `/api/*` ni POST.
+- Abierta desde el caché, la página trae los filtros de cuando se guardó: `VaultApp` relee la URL
+  al montar (`readUrl`).
+- Lo que necesita red de verdad (buscar en catálogos, cambiar el idioma, `completeTranslations`)
+  falla sin romper: `useLiveSearch` expone `failed` y el formulario dice que se complete a mano.
 
 ## Vista 3D
 

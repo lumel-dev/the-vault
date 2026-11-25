@@ -14,14 +14,15 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Plus, Search, X } from "lucide-react";
+import { CloudOff, CloudUpload, Plus, Search, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
-import { deleteItem, moveItem, placeItem, reorderItems } from "@/lib/actions/items";
 import { isItemType } from "@/lib/item-types";
+import { applyOp } from "@/lib/offline/apply";
+import { LAST, type Op } from "@/lib/offline/ops";
 import { stickerFor } from "@/lib/stickers";
 import type { VaultItem, VaultShelf } from "@/lib/queries";
 import { search } from "@/lib/search";
@@ -42,6 +43,7 @@ import { ItemPanel } from "./ItemPanel";
 import { Sticker } from "./Sticker";
 import { StickerDialog, type StickerDialogMode } from "./StickerDialog";
 import { StickersProvider, useStickers, type StickerWithCount } from "./StickersContext";
+import { useVaultStore, VaultStoreProvider, type SyncStatus } from "./VaultStore";
 
 // El 3D se baja aparte y sólo en el browser: la búsqueda y la grilla no lo esperan.
 const VaultScene = dynamic(() => import("@/components/vault3d/VaultScene"), {
@@ -60,10 +62,12 @@ export interface Filters {
 }
 
 interface Props {
+  userId: string;
+  /** Cuándo armó el server la colección (ms): decide si la guardada en el browser es más nueva. */
+  renderedAt: number;
   items: VaultItem[];
   stickers: StickerWithCount[];
   shelves: VaultShelf[];
-  unshelved: number;
   filters: Filters;
   tmdbEnabled: boolean;
   userName: string;
@@ -119,13 +123,6 @@ function saveDensity(density: Density) {
   window.dispatchEvent(new Event("vault:density"));
 }
 
-/** Lo mismo que hace el server al mover algo: a un mueble llega al final; a "Sin ubicar", primero. */
-function arrive(list: VaultItem[], item: VaultItem, shelfId: string | null): VaultItem[] {
-  const rest = list.filter((i) => i.id !== item.id);
-  const moved = { ...item, shelfId, level: 0 };
-  return shelfId ? [...rest, moved] : [moved, ...rest];
-}
-
 /** Sin orden en la URL, la grilla va alfabética: es como se busca algo con la vista. */
 const DEFAULT_SORT: SortKey = "name";
 
@@ -141,15 +138,12 @@ const collision: CollisionDetection = (args) => {
   return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => !String(c.id).startsWith(DROP_PREFIX)) });
 };
 
-export function VaultApp({ items: serverItems, stickers, shelves, unshelved, filters, tmdbEnabled, userName, logout }: Props) {
-  // Copia local para que mover y ordenar se vean al instante; se pisa con lo que manda el server
-  // después de cada acción (`revalidatePath`), y si una acción falla se vuelve atrás.
-  const [items, setItems] = useState(serverItems);
-  const [prevServer, setPrevServer] = useState(serverItems);
-  if (serverItems !== prevServer) {
-    setPrevServer(serverItems);
-    setItems(serverItems);
-  }
+export function VaultApp({ userId, renderedAt, items: serverItems, stickers: serverStickers, shelves: serverShelves, filters, tmdbEnabled, userName, logout }: Props) {
+  // La colección con los cambios que todavía no confirmó el server: todo se ve al instante, haya
+  // señal o no, y cada cambio pasa por `mutate` (la cola de `src/lib/offline/`).
+  const store = useVaultStore({ userId, renderedAt, items: serverItems, shelves: serverShelves, stickers: serverStickers });
+  const { items, shelves, stickers, unshelved } = store.data;
+  const { mutate } = store;
   const { locale, t } = useI18n();
 
   // Lo cargado desde TMDB antes de que la app fuera bilingüe se completa solo, de a tandas, en
@@ -157,12 +151,16 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
   const completing = useRef(false);
   const needsTranslations = serverItems.some((i) => i.externalSource === "tmdb" && Object.keys(i.translations ?? {}).length === 0);
   useEffect(() => {
-    if (!needsTranslations || !tmdbEnabled || completing.current) return;
+    if (!needsTranslations || !tmdbEnabled || completing.current || !navigator.onLine) return;
     completing.current = true;
     void (async () => {
-      for (let round = 0; round < 50; round++) {
-        const res = await completeTranslations();
-        if (!res.ok || res.data.remaining === 0 || res.data.done === 0) break;
+      try {
+        for (let round = 0; round < 50; round++) {
+          const res = await completeTranslations();
+          if (!res.ok || res.data.remaining === 0 || res.data.done === 0) break;
+        }
+      } catch {
+        // Sin señal: se completa la próxima vez que se abra con señal.
       }
       completing.current = false;
     })();
@@ -191,6 +189,27 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
   const [gridDragId, setGridDragId] = useState<string | null>(null);
   const timers = useRef(new Map<string, number>());
+
+  // Abierta sin señal, la página es la que guardó el service worker, con los filtros de cuando se
+  // guardó: mandan los de la barra de direcciones. Va antes del efecto de abajo, que la reescribe.
+  const readUrl = useEffectEvent(() => {
+    const params = new URLSearchParams(window.location.search);
+    const one = (k: string) => params.get(k) ?? "";
+    if (one("q") !== filters.q) setQ(one("q").slice(0, 200));
+    const tipo = one("tipo");
+    const sticker = stickers.find((s) => s.id === tipo)?.id ?? (isItemType(tipo) ? stickers.find((s) => s.base === tipo)?.id : undefined);
+    if (tipo !== filters.type) setType(sticker ?? "all");
+    const estante = one("estante");
+    if (estante !== filters.shelf) setFocus(estante === "none" || shelves.some((s) => s.id === estante) ? estante : "all");
+    const vista = one("vista");
+    if (vista !== (filters.view ?? "")) setUrlView(vista === "mueble" || vista === "grilla" ? vista : null);
+    const orden = one("orden");
+    if (orden !== filters.sort) setSort(isSortKey(orden) ? orden : DEFAULT_SORT);
+  });
+  // La URL es un sistema externo y sólo se lee al abrir: no hay forma de leerla al hidratar sin
+  // que lo dibujado por el server y por el browser difieran.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => readUrl(), []);
 
   // La URL refleja lo que se está mirando (se puede compartir y sobrevive al refresh), sin
   // pedirle nada al server: buscar no espera la red.
@@ -262,8 +281,7 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
    * Soltar un objeto en un lugar concreto (la vista 3D): estante y lugar en ese estante. Se guarda
    * como el lugar dentro de todo el mueble; los estantes se vuelven a repartir solos.
    */
-  async function place(itemId: string, containerId: string | null, level: number, index: number) {
-    const before = items;
+  function place(itemId: string, containerId: string | null, level: number, index: number) {
     const moving = items.find((i) => i.id === itemId);
     if (!moving) return;
     const shelf = shelves.find((s) => s.id === containerId) ?? null;
@@ -272,25 +290,18 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
     const spots = shelfSpots(shelf, inside);
     // Lo de los estantes de arriba va antes; después, el lugar dentro del estante.
     const flat = Math.min(inside.length, index + inside.filter((i) => (spots.get(i.id)?.level ?? 0) < level).length);
-    const insertAt =
-      flat < inside.length
-        ? rest.indexOf(inside[flat])
-        : inside.length
-          ? rest.indexOf(inside[inside.length - 1]) + 1
-          : Math.min(items.indexOf(moving), rest.length);
-    const moved = { ...moving, shelfId: containerId, level: 0 };
-    const next = [...rest];
-    next.splice(insertAt, 0, moved);
-    setItems(next);
-    const res = await placeItem(itemId, containerId, flat);
-    if (!res.ok) {
-      setItems(before);
-      toast.error(res.error);
-      return;
-    }
+    const op: Op = { kind: "placeItem", id: itemId, shelfId: containerId, index: flat };
+    if (!mutate(op)) return;
+    const next = applyOp({ items, shelves, stickers }, op).items;
     const shownName = visibleItems.find((i) => i.id === itemId)?.name ?? moving.name;
-    const w = whereabouts(moved, next, shelves, t);
+    const w = whereabouts({ ...moving, shelfId: containerId }, next, shelves, t);
     toast.success(t.toast.moved(shownName, [w.container, w.level].filter(Boolean).join(" · ")));
+  }
+
+  /** Llevar algo a un contenedor (o a "Sin ubicar"): a un mueble llega al final; a "Sin ubicar", primero. */
+  function moveTo(item: VaultItem, shelfId: string | null) {
+    if (!mutate({ kind: "placeItem", id: item.id, shelfId, index: shelfId ? LAST : 0 })) return;
+    toast.success(t.toast.moved(visibleItems.find((i) => i.id === item.id)?.name ?? item.name, shelves.find((s) => s.id === shelfId)?.name ?? t.where.unplaced));
   }
 
   /** Sacar de la bóveda: se tacha con fibrón y queda 5 segundos para deshacer. */
@@ -307,16 +318,14 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
       });
     };
     toast(t.toast.leaving(item.name), { action: { label: t.toast.undo, onClick: undo }, duration: 5000 });
-    const timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(() => {
       timers.current.delete(item.id);
-      const res = await deleteItem(item.id);
+      mutate({ kind: "deleteItem", id: item.id });
       setPendingDelete((s) => {
         const n = new Set(s);
         n.delete(item.id);
         return n;
       });
-      if (!res.ok) toast.error(res.error);
-      else setItems((curr) => curr.filter((i) => i.id !== item.id));
     }, 5000);
     timers.current.set(item.id, timer);
   }
@@ -325,21 +334,13 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
    * Acomodar un contenedor con el orden elegido: es como ordenar el estante a mano, así que cambia
    * el orden guardado (cada estante queda ordenado; nada cambia de estante).
    */
-  async function arrange(containerId: string | null) {
+  function arrange(containerId: string | null) {
     const inside = visibleItems.filter((i) => i.shelfId === containerId);
     if (inside.length < 2 || sort === "manual") return;
     const sorted = sortItems(inside, sort, stickerRank);
-    const before = items;
-    const ids = new Set(sorted.map((i) => i.id));
-    const rawById = new Map(items.map((i) => [i.id, i]));
-    const queue = sorted.map((i) => rawById.get(i.id)!);
-    setItems(items.map((i) => (ids.has(i.id) ? queue.shift()! : i)));
-    const res = await reorderItems(sorted.map((i) => i.id));
+    if (!mutate({ kind: "reorderItems", ids: sorted.map((i) => i.id) })) return;
     const name = containerId ? shelves.find((s) => s.id === containerId)?.name : t.where.unplaced;
-    if (!res.ok) {
-      setItems(before);
-      toast.error(res.error);
-    } else toast.success(t.toast.arranged(name ?? "", t.sort[sort].toLowerCase()));
+    toast.success(t.toast.arranged(name ?? "", t.sort[sort].toLowerCase()));
   }
 
   /* ---------------------------------------------------------- grilla: dnd-kit */
@@ -352,23 +353,17 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
     }),
   );
 
-  async function onGridDragEnd({ active, over }: DragEndEvent) {
+  function onGridDragEnd({ active, over }: DragEndEvent) {
     setGridDragId(null);
     if (!over) return;
     const id = String(active.id);
     const overId = String(over.id);
-    const before = items;
     if (overId.startsWith(DROP_PREFIX)) {
       const key = overId.slice(DROP_PREFIX.length);
       const target = key === "none" ? null : key;
       const item = items.find((i) => i.id === id);
       if (!item || item.shelfId === target) return;
-      setItems((curr) => arrive(curr, item, target));
-      const res = await moveItem(id, target);
-      if (!res.ok) {
-        setItems(before);
-        toast.error(res.error);
-      } else toast.success(t.toast.moved(visibleItems.find((i) => i.id === id)?.name ?? item.name, shelves.find((s) => s.id === target)?.name ?? t.where.unplaced));
+      moveTo(item, target);
       return;
     }
     if (id === overId || sort !== "manual") return;
@@ -376,28 +371,14 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
     const target = items.find((i) => i.id === overId);
     // Soltado sobre un objeto de otro contenedor (la grilla agrupada): va a ese contenedor.
     if (dragged && target && dragged.shelfId !== target.shelfId) {
-      setItems((curr) => arrive(curr, dragged, target.shelfId));
-      const res = await moveItem(id, target.shelfId);
-      if (!res.ok) {
-        setItems(before);
-        toast.error(res.error);
-      } else toast.success(t.toast.moved(visibleItems.find((i) => i.id === id)?.name ?? dragged.name, shelves.find((s) => s.id === target.shelfId)?.name ?? t.where.unplaced));
+      moveTo(dragged, target.shelfId);
       return;
     }
     const from = gridItems.findIndex((i) => i.id === id);
     const to = gridItems.findIndex((i) => i.id === overId);
     if (from < 0 || to < 0) return;
-    const reordered = arrayMove(gridItems, from, to);
     // Lo que no se ve en la grilla filtrada conserva su lugar en la colección.
-    const visible = new Set(reordered.map((i) => i.id));
-    const rawById = new Map(items.map((i) => [i.id, i]));
-    const queue = reordered.map((i) => rawById.get(i.id)!);
-    setItems(items.map((i) => (visible.has(i.id) ? queue.shift()! : i)));
-    const res = await reorderItems(reordered.map((i) => i.id));
-    if (!res.ok) {
-      setItems(before);
-      toast.error(res.error);
-    }
+    mutate({ kind: "reorderItems", ids: arrayMove(gridItems, from, to).map((i) => i.id) });
   }
 
   const gridDragItem = gridDragId ? items.find((i) => i.id === gridDragId) ?? null : null;
@@ -405,6 +386,7 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
   const matchList = matches && view === "mueble" ? visibleItems.filter((i) => matches.has(i.id)) : [];
 
   return (
+    <VaultStoreProvider store={store}>
     <StickersProvider stickers={stickers}>
     <DndContext
       id="vault-dnd"
@@ -417,7 +399,8 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
         screenReaderInstructions: { draggable: t.grid.dragInstructions },
       }}
     >
-      <div className="flex min-h-dvh flex-col md:h-dvh md:min-h-0">
+      {/* `data-vault-shell`: el service worker guarda para abrir sin señal sólo la página que la trae. */}
+      <div data-vault-shell="" className="flex min-h-dvh flex-col md:h-dvh md:min-h-0">
         <TopBar
           q={q}
           narrow={narrow}
@@ -428,6 +411,7 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
           userName={userName}
           logout={logout}
           matchCount={matches && q.trim() ? matches.size : null}
+          sync={store.status}
         />
 
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] md:grid-cols-[16.5rem_minmax(0,1fr)]">
@@ -545,6 +529,7 @@ export function VaultApp({ items: serverItems, stickers, shelves, unshelved, fil
       />
     </DndContext>
     </StickersProvider>
+    </VaultStoreProvider>
   );
 }
 
@@ -560,7 +545,9 @@ function TopBar({
   userName,
   logout,
   matchCount,
+  sync,
 }: {
+  sync: SyncStatus;
   q: string;
   narrow: boolean;
   onQuery: (q: string) => void;
@@ -630,12 +617,36 @@ function TopBar({
 
         {/* Una sola vez: en el celular sube al lado del logo con order, en desktop queda al final. */}
         <div className="order-2 ml-auto flex items-center gap-2 md:order-6 md:ml-0">
+          <SyncBadge status={sync} />
           <span className="hidden text-sm text-marker/80 md:inline">{userName}</span>
           <LocaleSwitch />
           {logout}
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Sin señal o con cambios por subir, lo dice; con todo subido, no muestra nada. En el celular,
+ * sólo el ícono (el texto queda de título y para el lector de pantalla).
+ */
+function SyncBadge({ status }: { status: SyncStatus }) {
+  const { t } = useI18n();
+  if (status.online && !status.pending && !status.sessionExpired) return null;
+  const text = status.sessionExpired
+    ? t.offline.session
+    : !status.online
+      ? status.pending
+        ? `${t.offline.offline} · ${t.offline.pending(status.pending)}`
+        : t.offline.offline
+      : t.offline.pending(status.pending);
+  const Icon = status.online && !status.sessionExpired ? CloudUpload : CloudOff;
+  return (
+    <span role="status" title={text} className="flex h-8 items-center gap-1.5 rounded-md bg-marker/10 px-2 text-xs font-semibold text-marker">
+      <Icon className={cn("size-4 shrink-0", status.online && status.pending > 0 && "animate-pulse")} aria-hidden />
+      <span className="sr-only md:not-sr-only">{text}</span>
+    </span>
   );
 }
 
@@ -970,7 +981,17 @@ function LocaleSwitch() {
           aria-pressed={locale === l}
           title={t.locale[l]}
           disabled={pending}
-          onClick={() => locale !== l && startTransition(() => setLocaleAction(l))}
+          onClick={() =>
+            locale !== l &&
+            startTransition(async () => {
+              // Cambiar el idioma lo guarda el server: sin señal, se avisa y queda el que estaba.
+              try {
+                await setLocaleAction(l);
+              } catch {
+                toast.error(t.offline.offline);
+              }
+            })
+          }
           className={cn("px-2 uppercase transition-colors", locale === l ? "bg-marker text-white" : "bg-card/50 text-marker hover:bg-card")}
         >
           {l}

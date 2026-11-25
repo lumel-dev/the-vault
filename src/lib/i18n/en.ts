@@ -127,6 +127,15 @@ const en: Messages = {
     containerCreated: (name: string) => `"${name}" is in the house`,
     containerDeleted: (name: string) => `"${name}" is gone; what it held is now unplaced`,
   },
+  offline: {
+    offline: "Offline",
+    pending: (n: number) => (n === 1 ? "1 change to upload" : `${n} changes to upload`),
+    upToDate: "All uploaded",
+    session: "Sign in again to upload your changes",
+    savedHere: (name: string) => `"${name}" is saved here; it uploads when you're back online`,
+    search: "Offline: the catalog isn't answering. Fill in the details by hand.",
+    page: "Offline. This page needs the internet.",
+  },
   panel: {
     aria: (name: string) => `${name}, where it is`,
     brand: "Brand",

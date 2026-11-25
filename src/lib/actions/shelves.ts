@@ -2,21 +2,16 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
+import type { ActionResult } from "@/lib/action-result";
 import { requireUserId } from "@/lib/auth/session";
-import { isContainerKind, type ContainerKind } from "@/lib/containers";
+import type { ContainerKind } from "@/lib/containers";
 import { db } from "@/lib/db";
 import { items, shelves } from "@/lib/db/schema";
 import { messages, type Messages } from "@/lib/i18n";
 import { getUserLocale } from "@/lib/i18n/server";
-import type { ActionResult } from "./items";
+import { clientId, shelfSchema, type ShelfInput } from "@/lib/schemas";
 
-const shelfSchema = z.object({
-  name: z.string().trim().min(1).max(60),
-  kind: z.string().refine(isContainerKind).default("shelf"),
-});
-
-export type ShelfInput = z.input<typeof shelfSchema>;
+export type { ShelfInput } from "@/lib/schemas";
 
 async function session() {
   const userId = await requireUserId();
@@ -40,14 +35,22 @@ function isUniqueViolation(error: unknown): boolean {
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
-export async function createShelf(input: ShelfInput): Promise<ActionResult<{ id: string; name: string }>> {
+/** `id` lo genera el browser: si ya existe, es un reenvío de la cola y no se crea otro. */
+export async function createShelf(input: ShelfInput, id?: string): Promise<ActionResult<{ id: string; name: string }>> {
   const { userId, t } = await session();
   const parsed = parse(input, t);
   if ("error" in parsed) return { ok: false, error: parsed.error! };
+  if (id !== undefined && !clientId.safeParse(id).success) return { ok: false, error: t.errors.invalid };
+  if (id) {
+    const [existing] = await db.select({ id: shelves.id, name: shelves.name, userId: shelves.userId }).from(shelves).where(eq(shelves.id, id)).limit(1);
+    if (existing?.userId === userId) return { ok: true, data: { id: existing.id, name: existing.name } };
+    if (existing) return { ok: false, error: t.errors.invalid };
+  }
   try {
     const [row] = await db
       .insert(shelves)
       .values({
+        ...(id ? { id } : {}),
         userId,
         ...parsed.data,
         position: sql`(select coalesce(max(${shelves.position}), 0) + 1 from ${shelves} where ${shelves.userId} = ${userId})`,

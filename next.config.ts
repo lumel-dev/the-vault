@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
+// Un id por build (la hora): va en la URL del service worker (`RegisterServiceWorker`), así cada
+// deploy instala el worker nuevo.
+const buildId = String(Date.now());
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   // Desde next 16.4, `next dev` corriendo bajo un agente agrega un bloque propio a
   // AGENTS.md. Las convenciones del repo ya viven ahí.
   agentRules: false,

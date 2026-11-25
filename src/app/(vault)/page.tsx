@@ -9,6 +9,11 @@ import { tmdbEnabled } from "@/lib/tmdb";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+/** La hora del server al armar la página: el browser la compara con la de su copia guardada. */
+function stamp(): number {
+  return Date.now();
+}
+
 function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? "";
 }
@@ -28,16 +33,19 @@ export default async function VaultPage({ searchParams }: { searchParams: Search
   const rawView = one(sp.vista);
   const view: View | null = rawView === "mueble" || rawView === "grilla" ? rawView : null;
 
+  // Antes de leer: lo que se lea es al menos tan nuevo como esta hora.
+  const renderedAt = stamp();
   // Los stickers primero: si la cuenta no tiene, se crean los de fábrica.
   const stickers = await listStickers(userId);
   const [items, shelfData] = await Promise.all([listItems(userId), listShelves(userId)]);
 
   return (
     <VaultApp
+      userId={userId}
+      renderedAt={renderedAt}
       items={items}
       stickers={stickers}
       shelves={shelfData.shelves}
-      unshelved={shelfData.unshelved}
       filters={{ q, type, shelf, view, sort: one(sp.orden) }}
       tmdbEnabled={tmdbEnabled()}
       userName={session.user.name ?? ""}

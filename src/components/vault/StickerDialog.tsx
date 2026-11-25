@@ -82,12 +82,12 @@ function Body({ mode, onClose, onDeleted }: { mode: StickerDialogMode; onClose: 
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium">{t.stickers.color}</legend>
         <div className="flex flex-wrap items-center gap-2">
-          {STICKER_PALETTE.map((c) => (
+          {STICKER_PALETTE.map((c, i) => (
             <button
               key={c}
               type="button"
               onClick={() => setColor(c)}
-              aria-label={c}
+              aria-label={t.stickers.colorNames[i] ?? c}
               aria-pressed={color === c}
               className={cn("grid size-8 place-items-center rounded-full shadow-[inset_0_-2px_0_rgb(0_0_0/18%)] ring-offset-2 ring-offset-background transition", color === c && "ring-2 ring-marker")}
               style={{ background: c }}

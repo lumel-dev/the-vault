@@ -21,7 +21,7 @@ import { deleteQueued, putQueued, readQueue, readSnapshot, saveSnapshot } from "
 import type { Op, OpResult, QueuedOp } from "@/lib/offline/ops";
 import { nextSeq, notifyOthers, onOthersChange, sync, type SyncOutcome } from "@/lib/offline/sync";
 
-/** Con cosas por subir, se reintenta cada tanto mientras la app esté abierta. */
+/** Con cosas por subir (o sin señal), se reintenta cada tanto mientras la app esté abierta. */
 const RETRY_MS = 20_000;
 
 export interface SyncStatus {
@@ -170,11 +170,12 @@ export function useVaultStore({ userId, renderedAt, items, shelves, stickers }: 
     };
   }, [reloadQueue]);
 
+  // Sin señal se sigue probando aunque no haya nada pendiente: así el aviso se va solo cuando vuelve.
   useEffect(() => {
-    if (!pending) return;
+    if (!pending && online) return;
     const timer = window.setInterval(() => void runSync(), RETRY_MS);
     return () => window.clearInterval(timer);
-  }, [pending]);
+  }, [pending, online]);
 
   const data = useMemo(() => applyOps(base.data, queue.map((q) => q.op)), [base, queue]);
 

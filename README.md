@@ -65,8 +65,9 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está en castellano y en inglés.
   señal se ve al instante, queda guardado en el dispositivo y se sube solo cuando vuelve la
   conexión; la barra avisa "Sin conexión · 2 cambios por subir". Buscar en TMDB, Open Library o
   MusicBrainz sí necesita internet: sin señal, el formulario se completa a mano. El número de
-  inventario de algo cargado sin señal aparece al subirse. En el celular, "Agregar a la pantalla
-  de inicio" la deja como una app.
+  inventario de algo cargado sin señal aparece al subirse. Para instalarla: en Android, el menú ⋮
+  → "Instalar app" (Chrome muestra el cartel solo pocas veces); en iPhone, Compartir → "Agregar a
+  inicio" (Safari nunca lo ofrece).
 
 ## Agregar un tipo o un campo
 
@@ -143,6 +144,10 @@ dueño de la base, porque la primera migración crea las extensiones `pg_trgm` y
   producción. Para probarlo, `pnpm build`, copiar `public/` y `.next/static` dentro de
   `.next/standalone/` (lo que hace el `Dockerfile`) y correr `node .next/standalone/server.js`;
   después, cortar el server y recargar.
+- **Las capturas del instalador** (`public/screenshots/`, en el manifest) son de una colección
+  de muestra cargada en una base local, nunca de una cuenta real. Si cambia mucho la pantalla,
+  se rehacen igual: 1080×2400 para el celular y 1920×1080 para la computadora, y el tamaño del
+  manifest tiene que coincidir con el de la imagen.
 - **Al pasar por el login se borra la colección guardada en ese browser** (en una computadora
   compartida, el siguiente no la ve sin señal). Lo que quedó sin subir se conserva y sube cuando
   entra su dueño.

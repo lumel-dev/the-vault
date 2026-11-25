@@ -7,6 +7,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // La identidad de la app instalada: si algún día cambia `start_url`, sigue siendo la misma.
+    id: "/",
     name: "The Vault",
     short_name: "The Vault",
     description: "Lo que tenés y dónde está: tus estantes, cajas y muebles, con cada cosa en su lugar.",
@@ -22,6 +24,15 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       // Sin un `maskable` propio, Android recorta el `any` y le come las esquinas.
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+    // Con capturas, Chrome muestra el instalador grande (como una tienda) en vez del cartel chico:
+    // `narrow` en el celular, `wide` en la computadora. Son de una colección de muestra en una base
+    // local, nunca de una cuenta real. Los tamaños tienen que ser los de la imagen.
+    screenshots: [
+      { src: "/screenshots/narrow-grid.webp", sizes: "1080x2400", type: "image/webp", form_factor: "narrow", label: "Tu colección, con la tapa de cada cosa" },
+      { src: "/screenshots/narrow-panel.webp", sizes: "1080x2400", type: "image/webp", form_factor: "narrow", label: "Dónde está cada cosa: mueble, estante y lugar" },
+      { src: "/screenshots/wide-shelves.webp", sizes: "1920x1080", type: "image/webp", form_factor: "wide", label: "Tus muebles en 3D, con cada lomo en su lugar" },
+      { src: "/screenshots/wide-spines.webp", sizes: "1920x1080", type: "image/webp", form_factor: "wide", label: "Toda la casa, contenedor por contenedor" },
     ],
   };
 }

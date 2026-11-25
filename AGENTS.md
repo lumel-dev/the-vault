@@ -170,6 +170,10 @@ pantallas del chofer de erp-base (fase 17.5).
   `/login` o `/registro` (junto con la colección de IndexedDB, `ForgetDevice`). Lo pendiente se
   conserva: lleva `userId` y `/api/sync` no lo aplica con otra sesión. Nunca cachea pedidos RSC,
   `/api/*` ni POST.
+- **Instalable**: `src/app/manifest.ts` con íconos 192/512 + maskable (`scripts/icons.mjs`) y
+  capturas `narrow`/`wide` (con ellas Chrome muestra el instalador grande). El diagnóstico de
+  Chrome es `Page.getInstallabilityErrors` por CDP, con un perfil normal: en incógnito siempre
+  da `in-incognito`.
 - Abierta desde el caché, la página trae los filtros de cuando se guardó: `VaultApp` relee la URL
   al montar (`readUrl`).
 - Lo que necesita red de verdad (buscar en catálogos, cambiar el idioma, `completeTranslations`)

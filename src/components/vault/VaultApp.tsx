@@ -941,9 +941,10 @@ function ArrangeControl({
   return (
     <div className="absolute right-3 bottom-3 z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg bg-card/95 p-2 shadow-[0_10px_30px_-12px_rgb(28_27_25/55%)]">
       <SortSelect sort={sort} onSort={onSort} />
+      {/* La pista sólo si se eligió un orden: con el de siempre (por nombre) no hay nada que acomodar. */}
       {sort !== "manual" &&
         (target === undefined ? (
-          <span className="text-xs text-muted-foreground">{t.scene.pickContainer}</span>
+          sort !== DEFAULT_SORT && <span className="text-xs text-muted-foreground">{t.scene.pickContainer}</span>
         ) : (
           <Button size="sm" onClick={() => onArrange(target)}>
             {t.scene.arrange(targetName ?? "")}

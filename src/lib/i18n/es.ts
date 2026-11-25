@@ -102,6 +102,8 @@ const es = {
     name: "Nombre",
     color: "Color",
     otherColor: "Otro",
+    // Los de `STICKER_PALETTE`, en el mismo orden: es lo que lee un lector de pantalla.
+    colorNames: ["Rojo", "Naranja", "Amarillo", "Verde", "Verde azulado", "Azul", "Violeta", "Rosa", "Marrón", "Negro", "Gris", "Blanco"],
     base: "Qué es",
     baseHint: "Decide dónde se buscan los datos y la tapa, qué campos tiene y cómo se ve en el mueble.",
     baseLocked: "Tiene cosas, así que no se le puede cambiar el tipo.",

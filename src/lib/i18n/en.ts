@@ -97,6 +97,7 @@ const en: Messages = {
     name: "Name",
     color: "Color",
     otherColor: "Other",
+    colorNames: ["Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Violet", "Pink", "Brown", "Black", "Gray", "White"],
     base: "What it is",
     baseHint: "It decides where data and covers come from, which fields it has and how it looks on the shelf.",
     baseLocked: "It has things in it, so its type can't change.",

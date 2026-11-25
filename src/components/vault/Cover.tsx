@@ -58,7 +58,7 @@ export function Cover({ type, stickerColor, name, coverSource, coverRef, size = 
         />
       ) : (
         <div className="flex size-full flex-col justify-between p-[9%] [container-type:inline-size]">
-          <Sticker type={type} color={stickerColor} className="size-[16%] min-h-2.5 min-w-2.5" />
+          <Sticker type={type} color={stickerColor} className="size-[16cqi] min-h-2.5 min-w-2.5" />
           <span className="tape line-clamp-4 -rotate-2 px-[0.5em] py-[0.25em] text-[clamp(0.6rem,7cqi,1rem)] leading-tight [overflow-wrap:anywhere]">
             {name}
           </span>

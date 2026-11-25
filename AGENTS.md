@@ -102,7 +102,8 @@ SQL; hoy no la usa la app.
 - `items.position` es un orden **global por usuario**. Cada contenedor muestra sus objetos en ese
   orden (y de ahí salen sus estantes). Lo que llega a un mueble, nuevo o movido, va al final
   (`max(position) + 1`, el último estante con lugar); lo que queda sin ubicar, primero
-  (`min(position) - 1`).
+  (`min(position) - 1`). Excepción: si en ese mueble ya están sus hermanas (mismo `external_id`,
+  otras temporadas), `besideSiblings` lo pone al lado, en orden de temporada (`src/lib/siblings.ts`).
 - `reorderItems(ids)` y `placeItem(id, contenedor, lugar)` **reparten entre los objetos
   tocados las posiciones que ya ocupaban**: lo que no se ve no se mueve. Está cubierto por tests
   de integración; si cambia el modelo de orden, esos tests son el contrato.

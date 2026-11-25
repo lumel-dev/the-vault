@@ -10,6 +10,7 @@ import { items, shelves, users, type ItemTranslations } from "@/lib/db/schema";
 import { messages, type Messages } from "@/lib/i18n";
 import { getUserLocale } from "@/lib/i18n/server";
 import { cleanAttributes, isItemType } from "@/lib/item-types";
+import { siblingIndex } from "@/lib/siblings";
 import { tmdbEnabled, tmdbTranslations } from "@/lib/tmdb";
 
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -169,6 +170,7 @@ export async function createItem(input: ItemInput): Promise<ActionResult<{ id: s
         .insert(items)
         .values({ ...values, translations, level: 0, userId, position: arrivalPosition(userId, parsed.data.shelfId), inventoryNumber: seq.n })
         .returning({ id: items.id, inventoryNumber: items.inventoryNumber });
+      await besideSiblings(tx, userId, created.id, parsed.data.shelfId, values.externalId, values.attributes.season, t);
       return created;
     });
     revalidatePath("/");
@@ -202,6 +204,7 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .returning({ id: items.id });
     if (!updated.length) throw new Error(t.errors.itemMissing);
+    if (moved) await db.transaction((tx) => besideSiblings(tx, userId, id, parsed.data.shelfId, values.externalId, values.attributes.season, t));
     revalidatePath("/");
     return undefined;
   });
@@ -257,6 +260,53 @@ export async function completeTranslations(): Promise<ActionResult<{ done: numbe
 }
 
 /**
+ * El lugar dentro de un contenedor, dentro de una transacción: `pickIndex` recibe lo que ya hay
+ * (en orden, sin el que se mueve) y dice dónde va. Se reparten las posiciones que ya ocupaban.
+ */
+async function placeInTx(
+  tx: Tx,
+  userId: string,
+  id: string,
+  shelfId: string | null,
+  pickIndex: (contents: { id: string; externalId: string | null; attributes: Record<string, string> }[]) => number,
+  t: Messages,
+): Promise<void> {
+  const [moving] = await tx
+    .select({ id: items.id, position: items.position })
+    .from(items)
+    .where(and(eq(items.id, id), eq(items.userId, userId)))
+    .for("update");
+  if (!moving) throw new Error(t.errors.itemMissing);
+
+  const neighbours = await tx
+    .select({ id: items.id, position: items.position, externalId: items.externalId, attributes: items.attributes })
+    .from(items)
+    .where(and(eq(items.userId, userId), shelfId ? eq(items.shelfId, shelfId) : isNull(items.shelfId), ne(items.id, moving.id)))
+    .orderBy(asc(items.position), asc(items.createdAt))
+    .for("update");
+
+  const order = neighbours.map((n) => n.id);
+  order.splice(Math.min(pickIndex(neighbours), order.length), 0, moving.id);
+  const slots = [...neighbours.map((n) => n.position), moving.position].sort((a, b) => a - b);
+  for (let i = 1; i < slots.length; i++) if (slots[i] <= slots[i - 1]) slots[i] = slots[i - 1] + 1;
+
+  const current = new Map([...neighbours, moving].map((r) => [r.id, r.position]));
+  for (const [i, itemId] of order.entries()) {
+    if (itemId === moving.id) {
+      await tx.update(items).set({ shelfId, level: 0, position: slots[i], updatedAt: new Date() }).where(eq(items.id, itemId));
+    } else if (current.get(itemId) !== slots[i]) {
+      await tx.update(items).set({ position: slots[i] }).where(eq(items.id, itemId));
+    }
+  }
+}
+
+/** Si en el mueble ya están sus hermanas (otras temporadas), lo pone al lado; si no, no toca nada. */
+async function besideSiblings(tx: Tx, userId: string, id: string, shelfId: string | null, externalId: string | null | undefined, season: string | undefined, t: Messages) {
+  if (!shelfId || !externalId) return;
+  await placeInTx(tx, userId, id, shelfId, (contents) => siblingIndex(contents, externalId, season) ?? contents.length, t);
+}
+
+/**
  * Arrastrar un objeto a un contenedor (o a "Sin ubicar"): a un mueble llega al final, que es el
  * último estante con lugar; a "Sin ubicar", primero.
  */
@@ -283,42 +333,7 @@ export async function placeItem(id: string, shelfId: string | null, index: numbe
   return guard(t, async () => {
     await db.transaction(async (tx) => {
       await checkContainer(userId, args.data.shelfId, t, tx);
-      const [moving] = await tx
-        .select({ id: items.id, position: items.position })
-        .from(items)
-        .where(and(eq(items.id, args.data.id), eq(items.userId, userId)))
-        .for("update");
-      if (!moving) throw new Error(t.errors.itemMissing);
-
-      const neighbours = await tx
-        .select({ id: items.id, position: items.position })
-        .from(items)
-        .where(
-          and(
-            eq(items.userId, userId),
-            args.data.shelfId ? eq(items.shelfId, args.data.shelfId) : isNull(items.shelfId),
-            ne(items.id, moving.id),
-          ),
-        )
-        .orderBy(asc(items.position), asc(items.createdAt))
-        .for("update");
-
-      const order = neighbours.map((n) => n.id);
-      order.splice(Math.min(args.data.index, order.length), 0, moving.id);
-      const slots = [...neighbours.map((n) => n.position), moving.position].sort((a, b) => a - b);
-      for (let i = 1; i < slots.length; i++) if (slots[i] <= slots[i - 1]) slots[i] = slots[i - 1] + 1;
-
-      const current = new Map([...neighbours, moving].map((r) => [r.id, r.position]));
-      for (const [i, itemId] of order.entries()) {
-        if (itemId === moving.id) {
-          await tx
-            .update(items)
-            .set({ shelfId: args.data.shelfId, level: 0, position: slots[i], updatedAt: new Date() })
-            .where(eq(items.id, itemId));
-        } else if (current.get(itemId) !== slots[i]) {
-          await tx.update(items).set({ position: slots[i] }).where(eq(items.id, itemId));
-        }
-      }
+      await placeInTx(tx, userId, args.data.id, args.data.shelfId, () => args.data.index, t);
     });
     revalidatePath("/");
     return undefined;

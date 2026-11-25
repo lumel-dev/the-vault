@@ -139,6 +139,26 @@ describe("items", { skip: sinBase }, () => {
     await assert.rejects(createItem({ type: "movie", name: "X" }), /No autenticado/);
   });
 
+  it("una temporada nueva va al lado de las otras de la misma serie", async () => {
+    const living = ok(await createShelf({ name: "Living" })).id;
+    const friends = (season: string) => ({ shelfId: living, type: "series", attributes: { season, format: "DVD" }, externalSource: "tmdb" as const, externalId: "tv:1668" });
+    await nuevo("Friends", friends("1"));
+    await nuevo("Matrix", { shelfId: living });
+    // La T3 ya se pone al lado de la T1, antes de Matrix.
+    await nuevo("Friends", friends("3"));
+    await nuevo("Lost", { shelfId: living });
+
+    await nuevo("Friends", friends("2"));
+    const orden = (await listItems(ana)).filter((i) => i.shelfId === living).map((i) => `${i.name}${i.attributes.season ?? ""}`);
+    assert.deepEqual(orden, ["Friends1", "Friends2", "Friends3", "Matrix", "Lost"]);
+
+    // Lo mismo si se la cambia de lugar editándola.
+    const suelta = await nuevo("Friends", { ...friends("4"), shelfId: null });
+    ok(await updateItem(suelta, { name: "Friends", ...friends("4") }));
+    const despues = (await listItems(ana)).filter((i) => i.shelfId === living).map((i) => `${i.name}${i.attributes.season ?? ""}`);
+    assert.deepEqual(despues, ["Friends1", "Friends2", "Friends3", "Friends4", "Matrix", "Lost"]);
+  });
+
   it("soltar en un lugar concreto de un mueble", async () => {
     const living = ok(await createShelf({ name: "Living" })).id;
     const ids: Record<string, string> = {};

@@ -160,7 +160,9 @@ pantallas del chofer de erp-base (fase 17.5).
 - **Cuándo se manda**: al encolar, al abrir, al volver la señal (`online`), al volver a la pestaña
   y cada 20 s con cosas pendientes. Una corrida a la vez, también entre pestañas
   (`navigator.locks`); las otras pestañas se enteran por `BroadcastChannel`. Con algo confirmado,
-  `router.refresh()` trae la colección nueva.
+  `router.refresh()` trae la colección nueva. Con la cola vacía se pregunta a `/api/health` si hay
+  red (`navigator.onLine` dice `true` con wifi sin internet o con el server caído), y sin señal se
+  sigue probando cada 20 s para que el aviso se vaya solo.
 - **La colección guardada** (IndexedDB, por usuario) y la de la página se comparan por
   `renderedAt`, la hora del server (`page.tsx`), no la del teléfono. Gana la más nueva.
 - **Service worker** (`public/sw.js`, escrito a mano, sólo en producción): estáticos con hash,

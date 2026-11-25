@@ -38,14 +38,28 @@ export type SyncOutcome = "ok" | "offline" | "session" | "error";
  * Manda lo pendiente de `userId`, de a lotes. `onResults` recibe lo que contestó el server por
  * cada lote (para avisar), después de que la cola ya quedó actualizada.
  */
+/**
+ * Sin nada que mandar, igual se pregunta si hay red: abierta desde el caché del service worker, la
+ * app no tiene otra forma de saber que está sin señal (`navigator.onLine` dice `true` con wifi sin
+ * internet, o con el server caído). `/api/health` no toca la base.
+ */
+async function reachable(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/health", { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function sendAll(userId: string, onResults: (results: OpResult[], sent: QueuedOp[]) => void): Promise<SyncOutcome> {
   const skipped = new Set<number>();
-  for (;;) {
+  for (let round = 0; ; round++) {
     const pending = (await readQueue())
       .filter((q) => q.status === "pending" && q.userId === userId && !skipped.has(q.seq))
       .sort((a, b) => a.seq - b.seq)
       .slice(0, MAX_BATCH);
-    if (!pending.length) return "ok";
+    if (!pending.length) return round > 0 || (await reachable()) ? "ok" : "offline";
 
     let res: Response;
     try {

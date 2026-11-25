@@ -35,10 +35,6 @@ export function nextSeq(): number {
 export type SyncOutcome = "ok" | "offline" | "session" | "error";
 
 /**
- * Manda lo pendiente de `userId`, de a lotes. `onResults` recibe lo que contestó el server por
- * cada lote (para avisar), después de que la cola ya quedó actualizada.
- */
-/**
  * Sin nada que mandar, igual se pregunta si hay red: abierta desde el caché del service worker, la
  * app no tiene otra forma de saber que está sin señal (`navigator.onLine` dice `true` con wifi sin
  * internet, o con el server caído). `/api/health` no toca la base.
@@ -52,6 +48,10 @@ async function reachable(): Promise<boolean> {
   }
 }
 
+/**
+ * Manda lo pendiente de `userId`, de a lotes. `onResults` recibe lo que contestó el server por
+ * cada lote (para avisar), después de que la cola ya quedó actualizada.
+ */
 async function sendAll(userId: string, onResults: (results: OpResult[], sent: QueuedOp[]) => void): Promise<SyncOutcome> {
   const skipped = new Set<number>();
   for (let round = 0; ; round++) {

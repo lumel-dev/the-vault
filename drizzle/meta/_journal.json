@@ -43,6 +43,13 @@
       "when": 1795628966923,
       "tag": "0005_stickers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795644053433,
+      "tag": "0006_borrar_columnas_de_estantes",
+      "breakpoints": true
     }
   ]
 }

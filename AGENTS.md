@@ -64,8 +64,8 @@ contrato; uno que lo cambia, lo actualiza.
   orden de `position`, como un texto en renglones: se llena el estante de arriba y lo que no entra
   pasa al siguiente. La escena, `whereabouts` ("Estante 2 · 3.º lugar") y `VaultApp.place` usan la
   misma función. Las columnas `shelves.levels` e `items.level` quedaron de antes (la migración
-  `0004` reordenó lo que había por estante y puso `level` en 0) y no se leen; se pueden borrar en
-  un cambio aparte (*contract*).
+  `0004` reordenó lo que había por estante y puso `level` en 0): el código ya no las lee ni las
+  escribe, y la migración siguiente las borra (*contract*, en un deploy aparte).
 - **Stickers** (`stickers`, `src/lib/stickers.ts`): son de cada usuario y cada objeto tiene uno
   (`items.sticker_id`). `base` es uno de `ITEM_TYPES` y **manda sobre el tipo**: al guardar,
   `items.type` pasa a ser la `base` del sticker (`resolveSticker`), así que campos, catálogos,

@@ -197,14 +197,13 @@ describe("items", { skip: sinBase }, () => {
     assert.equal((await reorderItems([id, id])).ok, false);
   });
 
-  it("borrar un contenedor deja sus objetos sin ubicar, en el nivel 0", async () => {
+  it("borrar un contenedor deja sus objetos sin ubicar", async () => {
     const mueble = ok(await createShelf({ name: "Mueble", kind: "cabinet" })).id;
     const id = await nuevo("Matrix", { shelfId: mueble });
     ok(await deleteShelf(mueble));
     const [item] = await listItems(ana);
     assert.equal(item.id, id);
     assert.equal(item.shelfId, null);
-    assert.equal(item.level, 0);
     const data = await listShelves(ana);
     assert.equal(data.shelves.length, 0);
     assert.equal(data.unshelved, 1);

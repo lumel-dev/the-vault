@@ -184,7 +184,7 @@ export async function createItem(input: ItemInput, id?: string): Promise<ActionR
       if (!seq) throw new UserError(t.errors.unauthenticated);
       const [created] = await tx
         .insert(items)
-        .values({ ...values, ...(id ? { id } : {}), translations, level: 0, userId, position: arrivalPosition(userId, parsed.data.shelfId), inventoryNumber: seq.n })
+        .values({ ...values, ...(id ? { id } : {}), translations, userId, position: arrivalPosition(userId, parsed.data.shelfId), inventoryNumber: seq.n })
         .returning({ id: items.id, inventoryNumber: items.inventoryNumber });
       await besideSiblings(tx, userId, created.id, parsed.data.shelfId, values.externalId, values.attributes.season, t);
       return created;
@@ -217,7 +217,7 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
     const moved = current.shelfId !== parsed.data.shelfId;
     const updated = await db
       .update(items)
-      .set({ ...values, translations, level: 0, ...(moved ? { position: arrivalPosition(userId, parsed.data.shelfId) } : {}), updatedAt: new Date() })
+      .set({ ...values, translations, ...(moved ? { position: arrivalPosition(userId, parsed.data.shelfId) } : {}), updatedAt: new Date() })
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .returning({ id: items.id });
     if (!updated.length) throw new UserError(t.errors.itemMissing);
@@ -310,7 +310,7 @@ async function placeInTx(
   const current = new Map([...neighbours, moving].map((r) => [r.id, r.position]));
   for (const [i, itemId] of order.entries()) {
     if (itemId === moving.id) {
-      await tx.update(items).set({ shelfId, level: 0, position: slots[i], updatedAt: new Date() }).where(eq(items.id, itemId));
+      await tx.update(items).set({ shelfId, position: slots[i], updatedAt: new Date() }).where(eq(items.id, itemId));
     } else if (current.get(itemId) !== slots[i]) {
       await tx.update(items).set({ position: slots[i] }).where(eq(items.id, itemId));
     }

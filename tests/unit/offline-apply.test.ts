@@ -16,7 +16,6 @@ function item(n: number, name: string, shelfId: string | null, extra: Partial<Va
   return {
     id: id(n),
     shelfId,
-    level: 0,
     type: "movie",
     stickerId: MOVIES,
     name,

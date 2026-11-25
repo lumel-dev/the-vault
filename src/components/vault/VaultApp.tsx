@@ -446,7 +446,7 @@ export function VaultApp({ items: serverItems, shelves, unshelved, filters, tmdb
         )}
       </DragOverlay>
 
-      <ItemDialog mode={itemDialog} shelves={shelves} tmdbEnabled={tmdbEnabled} onClose={() => setItemDialog(null)} />
+      <ItemDialog mode={itemDialog} items={items} shelves={shelves} tmdbEnabled={tmdbEnabled} onClose={() => setItemDialog(null)} />
       <ContainerDialog
         mode={containerDialog}
         onClose={() => setContainerDialog(null)}

@@ -14,7 +14,6 @@ const en: Messages = {
     create: "Create",
     close: "Close",
     edit: "Edit",
-    search: "Search",
     seeAll: "See everything",
     loading: "One moment…",
   },

@@ -163,6 +163,11 @@ SQL; hoy no la usa la app.
 - Los componentes de `src/components/ui/` vienen de shadcn (`base-nova`). Al agregar uno con el
   CLI, revisar que importe `cn` de `@/lib/utils` y no de un paquete `cn` de npm (el CLI lo hizo
   una vez y lo instaló como dependencia).
+- **Todo buscador busca mientras se tipea**, sin botón (Enter busca ya). Los que van a la red usan
+  `useLiveSearch` (`src/lib/use-live-search.ts`): espera a que se deje de tipear y descarta las
+  respuestas viejas. MusicBrainz admite un pedido por segundo: `searchAlbums` los espacia en el
+  server. Lo escrito en el buscador del formulario vive en `ItemForm`: al cambiar de tipo se
+  busca lo mismo en el catálogo nuevo.
 - `<select>` nativo (`NativeSelect`) en vez del Select de Base UI: en el celular abre el selector
   del sistema.
 - Las filas que se deslizan en el celular usan `no-scrollbar`; las grillas que las contienen usan

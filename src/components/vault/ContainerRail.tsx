@@ -125,17 +125,20 @@ export function ContainerRail({ shelves, unshelved, total, current, hits, draggi
               onEdit={() => onEdit(s)}
             />
           ))}
-          <Row
-            id="none"
-            active={current === "none"}
-            droppable
-            dragging={dragging}
-            icon={<ContainerIcon kind={null} />}
-            label={t.rail.unplaced}
-            count={unshelved}
-            hits={hits?.get(null)}
-            onPick={() => onPick("none")}
-          />
+          {/* Vacío no se muestra, salvo mientras se arrastra (es donde se suelta para desubicar algo). */}
+          {(unshelved > 0 || dragging || current === "none") && (
+            <Row
+              id="none"
+              active={current === "none"}
+              droppable
+              dragging={dragging}
+              icon={<ContainerIcon kind={null} />}
+              label={t.rail.unplaced}
+              count={unshelved}
+              hits={hits?.get(null)}
+              onPick={() => onPick("none")}
+            />
+          )}
           <li className="shrink-0 md:mt-1">
             <button
               type="button"

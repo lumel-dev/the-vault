@@ -72,6 +72,8 @@ const en: Messages = {
     arrange: (name: string) => `Arrange ${name} this way`,
   },
   grid: {
+    density: "Layout",
+    densities: { covers: "Covers", small: "Small", list: "List", spines: "Spines" },
     objects: (n: number) => (n === 1 ? "1 item" : `${n} items`),
     emptyTitle: "The house is empty",
     emptyBody: "Tell it what furniture and boxes you have, and add what's in each one.",
@@ -79,7 +81,7 @@ const en: Messages = {
     nothingOfType: "Nothing of this type here",
     seeWholeHouse: "See the whole house",
     hintManual: "Drag a cover onto a container to store it there, or between the others to reorder it.",
-    hintSorted: (by: string, manual: string) => `Sorted by ${by}. To arrange by hand, go back to "${manual}".`,
+    hintSorted: (by: string, manual: string) => `Sorted by ${by}. Drag something onto a container to store it there; to arrange by hand, pick "${manual}".`,
     cardAria: (name: string) => `${name}. Enter to see where it is; space to drag.`,
     noGenre: "No genre",
     noYear: "No year",

@@ -3,18 +3,21 @@
 import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { UserError, type ActionResult } from "@/lib/action-result";
 import { requireUserId } from "@/lib/auth/session";
 import { isValidCover } from "@/lib/covers";
 import { db } from "@/lib/db";
 import { items, shelves, stickers, users, type ItemTranslations } from "@/lib/db/schema";
 import { messages, type Messages } from "@/lib/i18n";
 import { getUserLocale } from "@/lib/i18n/server";
-import { cleanAttributes, isItemType } from "@/lib/item-types";
+import { cleanAttributes } from "@/lib/item-types";
 import { ensureStickers } from "@/lib/queries";
+import { clientId, EXTERNAL_ID, itemSchema, type ItemInput } from "@/lib/schemas";
 import { siblingIndex } from "@/lib/siblings";
 import { tmdbEnabled, tmdbTranslations } from "@/lib/tmdb";
 
-export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
+export type { ActionResult } from "@/lib/action-result";
+export type { ItemInput } from "@/lib/schemas";
 
 /** El usuario de la sesión, su idioma y sus textos: los errores vuelven en su idioma. */
 async function session() {
@@ -22,39 +25,6 @@ async function session() {
   const locale = await getUserLocale(userId);
   return { userId, locale, t: messages[locale] };
 }
-
-const optionalText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .nullish()
-    .transform((v) => v || null);
-
-const itemSchema = z.object({
-  type: z.string().refine(isItemType),
-  name: z.string().trim().min(1).max(200),
-  description: optionalText(2000),
-  brand: optionalText(120),
-  model: optionalText(120),
-  shelfId: z.uuid().nullish().transform((v) => v ?? null),
-  // El sticker manda: el tipo del objeto es su `base`. Sin sticker, el primero del tipo.
-  stickerId: z.uuid().nullish(),
-  attributes: z.record(z.string(), z.unknown()).default({}),
-  coverSource: z.string().nullish(),
-  coverRef: z.string().nullish(),
-  externalSource: z.enum(["tmdb", "openlibrary", "musicbrainz"]).nullish(),
-  externalId: z.string().max(80).nullish(),
-});
-
-/** Cómo es el id de cada catálogo: "movie:603", "work:OL14860424W", "release-group:<mbid>". */
-const EXTERNAL_ID: Record<string, RegExp> = {
-  tmdb: /^(movie|tv):\d{1,10}$/,
-  openlibrary: /^work:OL\d{1,12}W$/,
-  musicbrainz: /^release-group:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-};
-
-export type ItemInput = z.input<typeof itemSchema>;
 
 function firstError(error: z.ZodError, t: Messages): string {
   const field = error.issues[0]?.path[0];
@@ -76,7 +46,7 @@ async function resolveSticker(userId: string, stickerId: string | null | undefin
       .from(stickers)
       .where(and(eq(stickers.id, stickerId), eq(stickers.userId, userId)))
       .limit(1);
-    if (!own) throw new Error(t.errors.stickerMissing);
+    if (!own) throw new UserError(t.errors.stickerMissing);
     return own;
   }
   await ensureStickers(userId);
@@ -86,7 +56,7 @@ async function resolveSticker(userId: string, stickerId: string | null | undefin
     .where(and(eq(stickers.userId, userId), eq(stickers.base, type)))
     .orderBy(asc(stickers.position), asc(stickers.createdAt))
     .limit(1);
-  if (!first) throw new Error(t.errors.stickerMissing);
+  if (!first) throw new UserError(t.errors.stickerMissing);
   return first;
 }
 
@@ -98,7 +68,7 @@ async function checkContainer(userId: string, shelfId: string | null, t: Message
     .from(shelves)
     .where(and(eq(shelves.id, shelfId), eq(shelves.userId, userId)))
     .limit(1);
-  if (!row) throw new Error(t.errors.containerMissing);
+  if (!row) throw new UserError(t.errors.containerMissing);
 }
 
 function toValues(data: z.output<typeof itemSchema>) {
@@ -169,19 +139,36 @@ function arrivalPosition(userId: string, shelfId: string | null) {
   return shelfId ? bottomPosition(userId) : topPosition(userId);
 }
 
+/** Los `UserError` vuelven con su texto; cualquier otra falla es inesperada y se puede reintentar. */
 async function guard<T>(t: Messages, fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, data: await fn() };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : t.errors.unexpected };
+    if (error instanceof UserError) return { ok: false, error: error.message };
+    console.error("[items]", error);
+    return { ok: false, error: t.errors.unexpected, retry: true };
   }
 }
 
-export async function createItem(input: ItemInput): Promise<ActionResult<{ id: string; inventoryNumber: number }>> {
+/**
+ * Carga un objeto. `id` lo genera el browser (la cola de cambios, `src/lib/offline/`): si ya
+ * existe, es un reenvío y se devuelve el que había, sin gastar otro número de inventario.
+ */
+export async function createItem(input: ItemInput, id?: string): Promise<ActionResult<{ id: string; inventoryNumber: number }>> {
   const { userId, locale, t } = await session();
   const parsed = itemSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error, t) };
+  if (id !== undefined && !clientId.safeParse(id).success) return { ok: false, error: t.errors.invalid };
   return guard(t, async () => {
+    if (id) {
+      const [existing] = await db
+        .select({ id: items.id, inventoryNumber: items.inventoryNumber, userId: items.userId })
+        .from(items)
+        .where(eq(items.id, id))
+        .limit(1);
+      if (existing?.userId === userId) return { id: existing.id, inventoryNumber: existing.inventoryNumber };
+      if (existing) throw new UserError(t.errors.invalid);
+    }
     const sticker = await resolveSticker(userId, parsed.data.stickerId, parsed.data.type, t);
     const values = { ...toValues({ ...parsed.data, type: sticker.base as typeof parsed.data.type }), stickerId: sticker.id };
     // TMDB se consulta antes de abrir la transacción: no tiene sentido tenerla abierta esperando la red.
@@ -194,10 +181,10 @@ export async function createItem(input: ItemInput): Promise<ActionResult<{ id: s
         .set({ inventorySeq: sql`${users.inventorySeq} + 1` })
         .where(eq(users.id, userId))
         .returning({ n: users.inventorySeq });
-      if (!seq) throw new Error(t.errors.unauthenticated);
+      if (!seq) throw new UserError(t.errors.unauthenticated);
       const [created] = await tx
         .insert(items)
-        .values({ ...values, translations, level: 0, userId, position: arrivalPosition(userId, parsed.data.shelfId), inventoryNumber: seq.n })
+        .values({ ...values, ...(id ? { id } : {}), translations, level: 0, userId, position: arrivalPosition(userId, parsed.data.shelfId), inventoryNumber: seq.n })
         .returning({ id: items.id, inventoryNumber: items.inventoryNumber });
       await besideSiblings(tx, userId, created.id, parsed.data.shelfId, values.externalId, values.attributes.season, t);
       return created;
@@ -217,7 +204,7 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
       .from(items)
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .limit(1);
-    if (!current) throw new Error(t.errors.itemMissing);
+    if (!current) throw new UserError(t.errors.itemMissing);
     const sticker = await resolveSticker(userId, parsed.data.stickerId, parsed.data.type, t);
     const values = { ...toValues({ ...parsed.data, type: sticker.base as typeof parsed.data.type }), stickerId: sticker.id };
     const translations = await buildTranslations(values, locale, {
@@ -233,7 +220,7 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
       .set({ ...values, translations, level: 0, ...(moved ? { position: arrivalPosition(userId, parsed.data.shelfId) } : {}), updatedAt: new Date() })
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .returning({ id: items.id });
-    if (!updated.length) throw new Error(t.errors.itemMissing);
+    if (!updated.length) throw new UserError(t.errors.itemMissing);
     if (moved) await db.transaction((tx) => besideSiblings(tx, userId, id, parsed.data.shelfId, values.externalId, values.attributes.season, t));
     revalidatePath("/");
     return undefined;
@@ -247,7 +234,7 @@ export async function deleteItem(id: string): Promise<ActionResult> {
       .delete(items)
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .returning({ id: items.id });
-    if (!deleted.length) throw new Error(t.errors.itemMissing);
+    if (!deleted.length) throw new UserError(t.errors.itemMissing);
     revalidatePath("/");
     return undefined;
   });
@@ -306,7 +293,7 @@ async function placeInTx(
     .from(items)
     .where(and(eq(items.id, id), eq(items.userId, userId)))
     .for("update");
-  if (!moving) throw new Error(t.errors.itemMissing);
+  if (!moving) throw new UserError(t.errors.itemMissing);
 
   const neighbours = await tx
     .select({ id: items.id, position: items.position, externalId: items.externalId, attributes: items.attributes })
@@ -390,7 +377,7 @@ export async function reorderItems(orderedIds: string[]): Promise<ActionResult> 
         .from(items)
         .where(and(eq(items.userId, userId), inArray(items.id, ids.data)))
         .for("update");
-      if (rows.length !== ids.data.length) throw new Error(t.errors.itemsMissing);
+      if (rows.length !== ids.data.length) throw new UserError(t.errors.itemsMissing);
       const slots = rows.map((r) => r.position).sort((a, b) => a - b);
       // Posiciones repetidas (dos objetos con el mismo número) se separan para que el orden nuevo
       // quede firme: cada slot es al menos uno más que el anterior.

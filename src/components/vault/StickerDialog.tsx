@@ -1,20 +1,20 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { createSticker, deleteSticker, updateSticker } from "@/lib/actions/stickers";
 import { ITEM_TYPE_KEYS, type ItemType } from "@/lib/item-types";
 import { useI18n } from "@/lib/i18n/client";
 import { STICKER_PALETTE } from "@/lib/stickers";
 import { cn } from "@/lib/utils";
 import { Sticker } from "./Sticker";
 import { useStickers, type StickerWithCount } from "./StickersContext";
+import { useVault } from "./VaultStore";
 
 export type StickerDialogMode = { kind: "create" } | { kind: "edit"; sticker: StickerWithCount };
 
@@ -37,7 +37,7 @@ function Body({ mode, onClose, onDeleted }: { mode: StickerDialogMode; onClose: 
   const [name, setName] = useState(sticker?.name ?? "");
   const [color, setColor] = useState(sticker?.color ?? STICKER_PALETTE[6]);
   const [confirming, setConfirming] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const { mutate } = useVault();
 
   const used = sticker ? sticker.count : 0;
   const baseLocked = used > 0;
@@ -48,25 +48,20 @@ function Body({ mode, onClose, onDeleted }: { mode: StickerDialogMode; onClose: 
 
   function save(e: React.FormEvent) {
     e.preventDefault();
-    startTransition(async () => {
-      const input = { name: name.trim() || null, color, base };
-      const res = sticker ? await updateSticker(sticker.id, input) : await createSticker(input);
-      if (!res.ok) return void toast.error(res.error);
-      toast.success(sticker ? t.stickers.saved : t.stickers.created(name.trim() || defaultName));
-      onClose();
-    });
+    const input = { name: name.trim() || null, color, base };
+    const ok = sticker ? mutate({ kind: "updateSticker", id: sticker.id, input }) : mutate({ kind: "createSticker", id: crypto.randomUUID(), input });
+    if (!ok) return;
+    toast.success(sticker ? t.stickers.saved : t.stickers.created(name.trim() || defaultName));
+    onClose();
   }
 
   function remove() {
     if (!sticker) return;
     if (!confirming) return setConfirming(true);
-    startTransition(async () => {
-      const res = await deleteSticker(sticker.id, used > 0 ? moveTo : null);
-      if (!res.ok) return void toast.error(res.error);
-      toast.success(t.stickers.deleted(label(sticker)));
-      onDeleted(sticker.id);
-      onClose();
-    });
+    if (!mutate({ kind: "deleteSticker", id: sticker.id, moveTo: used > 0 ? moveTo || null : null })) return;
+    toast.success(t.stickers.deleted(label(sticker)));
+    onDeleted(sticker.id);
+    onClose();
   }
 
   return (
@@ -138,11 +133,11 @@ function Body({ mode, onClose, onDeleted }: { mode: StickerDialogMode; onClose: 
 
       <DialogFooter className={cn(sticker && "sm:justify-between")}>
         {sticker && (
-          <Button type="button" variant={confirming ? "destructive" : "ghost"} onClick={remove} disabled={pending || (confirming && used > 0 && !targets.length)}>
+          <Button type="button" variant={confirming ? "destructive" : "ghost"} onClick={remove} disabled={confirming && used > 0 && !targets.length}>
             {confirming ? t.stickers.confirmDelete : t.stickers.delete}
           </Button>
         )}
-        <Button type="submit" disabled={pending}>
+        <Button type="submit">
           {sticker ? t.common.save : t.common.create}
         </Button>
       </DialogFooter>

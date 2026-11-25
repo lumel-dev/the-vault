@@ -3,33 +3,20 @@
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { ActionResult } from "@/lib/action-result";
 import { requireUserId } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { items, stickers } from "@/lib/db/schema";
 import { messages } from "@/lib/i18n";
 import { getUserLocale } from "@/lib/i18n/server";
-import { isItemType } from "@/lib/item-types";
-import { isHexColor } from "@/lib/stickers";
-import type { ActionResult } from "./items";
+import { clientId, stickerSchema, type StickerInput } from "@/lib/schemas";
+
+export type { StickerInput } from "@/lib/schemas";
 
 async function session() {
   const userId = await requireUserId();
   return { userId, t: messages[await getUserLocale(userId)] };
 }
-
-const stickerSchema = z.object({
-  // Vacío = el nombre de su tipo, en el idioma de quien lo mira (los de fábrica empiezan así).
-  name: z
-    .string()
-    .trim()
-    .max(40)
-    .nullish()
-    .transform((v) => v || null),
-  color: z.string().refine(isHexColor),
-  base: z.string().refine(isItemType),
-});
-
-export type StickerInput = z.input<typeof stickerSchema>;
 
 function parse(input: StickerInput, t: (typeof messages)["es"]) {
   const parsed = stickerSchema.safeParse(input);
@@ -46,13 +33,21 @@ async function countItems(userId: string, stickerId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
-export async function createSticker(input: StickerInput): Promise<ActionResult<{ id: string }>> {
+/** `id` lo genera el browser: si ya existe, es un reenvío de la cola y no se crea otro. */
+export async function createSticker(input: StickerInput, id?: string): Promise<ActionResult<{ id: string }>> {
   const { userId, t } = await session();
   const parsed = parse(input, t);
   if ("error" in parsed) return { ok: false, error: parsed.error! };
+  if (id !== undefined && !clientId.safeParse(id).success) return { ok: false, error: t.errors.invalid };
+  if (id) {
+    const [existing] = await db.select({ userId: stickers.userId }).from(stickers).where(eq(stickers.id, id)).limit(1);
+    if (existing?.userId === userId) return { ok: true, data: { id } };
+    if (existing) return { ok: false, error: t.errors.invalid };
+  }
   const [row] = await db
     .insert(stickers)
     .values({
+      ...(id ? { id } : {}),
       ...parsed.data,
       userId,
       position: sql`(select coalesce(max(${stickers.position}), -1) + 1 from ${stickers} where ${stickers.userId} = ${userId})`,

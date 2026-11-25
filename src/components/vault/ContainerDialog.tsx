@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createShelf, deleteShelf, updateShelf } from "@/lib/actions/shelves";
 import { CONTAINER_KIND_KEYS, type ContainerKind } from "@/lib/containers";
 import type { VaultShelf } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { ContainerIcon } from "./ContainerIcon";
+import { useVault } from "./VaultStore";
 
 export type ContainerDialogMode = { kind: "create" } | { kind: "edit"; shelf: VaultShelf };
 
@@ -36,31 +36,26 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
   const [name, setName] = useState(shelf?.name ?? "");
   const [kind, setKind] = useState<ContainerKind>((shelf?.kind as ContainerKind) ?? "shelf");
   const [confirming, setConfirming] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const { mutate } = useVault();
   const { t } = useI18n();
 
   function save(e: React.FormEvent) {
     e.preventDefault();
-    startTransition(async () => {
-      // Los estantes no se eligen: un mueble mide 80 cm y suma estantes a medida que se llena.
-      const input = { name, kind };
-      const res = shelf ? await updateShelf(shelf.id, input) : await createShelf(input);
-      if (!res.ok) return void toast.error(res.error);
-      toast.success(shelf ? t.toast.containerSaved : t.toast.containerCreated(name.trim()));
-      onClose();
-    });
+    // Los estantes no se eligen: un mueble mide 80 cm y suma estantes a medida que se llena.
+    const input = { name, kind };
+    const ok = shelf ? mutate({ kind: "updateShelf", id: shelf.id, input }) : mutate({ kind: "createShelf", id: crypto.randomUUID(), input });
+    if (!ok) return;
+    toast.success(shelf ? t.toast.containerSaved : t.toast.containerCreated(name.trim()));
+    onClose();
   }
 
   function remove() {
     if (!shelf) return;
     if (!confirming) return setConfirming(true);
-    startTransition(async () => {
-      const res = await deleteShelf(shelf.id);
-      if (!res.ok) return void toast.error(res.error);
-      toast.success(t.toast.containerDeleted(shelf.name));
-      onDeleted(shelf.id);
-      onClose();
-    });
+    if (!mutate({ kind: "deleteShelf", id: shelf.id })) return;
+    toast.success(t.toast.containerDeleted(shelf.name));
+    onDeleted(shelf.id);
+    onClose();
   }
 
   return (
@@ -99,11 +94,11 @@ function Body({ mode, onClose, onDeleted }: { mode: ContainerDialogMode; onClose
 
       <DialogFooter className={cn(shelf && "sm:justify-between")}>
         {shelf && (
-          <Button type="button" variant={confirming ? "destructive" : "ghost"} onClick={remove} disabled={pending}>
+          <Button type="button" variant={confirming ? "destructive" : "ghost"} onClick={remove}>
             {confirming ? t.container.confirmDelete : t.container.delete}
           </Button>
         )}
-        <Button type="submit" disabled={pending || !name.trim()}>
+        <Button type="submit" disabled={!name.trim()}>
           {shelf ? t.common.save : t.common.create}
         </Button>
       </DialogFooter>

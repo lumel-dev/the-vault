@@ -60,6 +60,13 @@ Auth.js v5, dnd-kit, Tailwind v4 y shadcn/ui. Está en castellano y en inglés.
   inglés). La búsqueda encuentra por el título en cualquiera ("Tiempos violentos" o "Pulp Fiction").
   Libros y discos conservan su título original. Antes de entrar, se usa el idioma del navegador.
 - **Sacar de la bóveda** tacha el objeto con fibrón y deja 5 segundos para deshacer.
+- **Anda sin señal y se instala** (PWA). Una vez abierta con internet, la bóveda abre igual sin
+  conexión: la colección, las tapas ya vistas y el mueble 3D. Lo que cargás, movés o borrás sin
+  señal se ve al instante, queda guardado en el dispositivo y se sube solo cuando vuelve la
+  conexión; la barra avisa "Sin conexión · 2 cambios por subir". Buscar en TMDB, Open Library o
+  MusicBrainz sí necesita internet: sin señal, el formulario se completa a mano. El número de
+  inventario de algo cargado sin señal aparece al subirse. En el celular, "Agregar a la pantalla
+  de inicio" la deja como una app.
 
 ## Agregar un tipo o un campo
 
@@ -99,6 +106,7 @@ pnpm test          # unitarios + integración (estos piden Postgres, ver tests/R
 pnpm db:generate   # escribe la migración SQL de un cambio en src/lib/db/schema.ts
 pnpm db:migrate    # aplica las migraciones pendientes a la base del entorno
 pnpm db:studio     # Drizzle Studio
+node scripts/icons.mjs  # regenera los íconos de la PWA (public/icons/) desde src/app/icon.svg
 ```
 
 ## Deploy
@@ -131,6 +139,13 @@ dueño de la base, porque la primera migración crea las extensiones `pg_trgm` y
   colecciones de cientos de objetos; con varios miles conviene paginar la grilla y revisar el 3D.
 - **El 3D se baja aparte**: la grilla y la búsqueda funcionan aunque el mueble todavía se esté
   armando, también en el celular.
+- **El modo sin señal no se prueba con `pnpm dev`**: el service worker sólo se registra en
+  producción. Para probarlo, `pnpm build`, copiar `public/` y `.next/static` dentro de
+  `.next/standalone/` (lo que hace el `Dockerfile`) y correr `node .next/standalone/server.js`;
+  después, cortar el server y recargar.
+- **Al pasar por el login se borra la colección guardada en ese browser** (en una computadora
+  compartida, el siguiente no la ve sin señal). Lo que quedó sin subir se conserva y sube cuando
+  entra su dueño.
 - **Un cambio en `schema.ts` necesita su migración** (`pnpm db:generate`) en el mismo PR: el
   deploy aplica lo que hay en `drizzle/`, no el schema.
 
